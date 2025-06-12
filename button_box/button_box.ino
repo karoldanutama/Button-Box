@@ -13,7 +13,7 @@
 #define NUMROWS 5
 #define NUMCOLS 5
 #define DIMENSION_5x5
-#define BUTTON_PRESS_DURATION 100  // Duration in milliseconds
+#define BUTTON_PRESS_DURATION -1  // -1 for original behavior, positive value for momentary press duration in ms
 
 #ifdef DIMENSION_6x4
 byte buttons[NUMROWS][NUMCOLS] = {
@@ -140,8 +140,9 @@ void CheckAllButtons(void) {
             Joystick.setButton(buttbx.key[i].kchar, 1);
             break;
           case HOLD:
-            // Check if we need to release the button
-            if (millis() - buttonPressTimes[buttbx.key[i].kchar] >= BUTTON_PRESS_DURATION) {
+            // Only auto-release if BUTTON_PRESS_DURATION is not -1
+            if (BUTTON_PRESS_DURATION > 0 && 
+                millis() - buttonPressTimes[buttbx.key[i].kchar] >= BUTTON_PRESS_DURATION) {
               Joystick.setButton(buttbx.key[i].kchar, 0);
             }
             break;
