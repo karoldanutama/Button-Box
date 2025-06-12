@@ -7,15 +7,34 @@
 #include <Keypad.h>
 #include <Joystick.h>
 
+#define DIMENSION_5x5
 #define ENABLE_PULLUPS
 #define NUMROTARIES 4
 #define NUMBUTTONS 24
+
+#ifdef DIMENSION_6x5
 #define NUMROWS 5
 #define NUMCOLS 5
-#define DIMENSION_5x5
+#elseif DIMENSION_6x4
+#define NUMROWS 6
+#define NUMCOLS 4
+#else
+#define NUMROWS 5
+#define NUMCOLS 5
+#endif
+
 #define BUTTON_PRESS_DURATION -1  // -1 for original behavior, positive value for momentary press duration in ms
 
-#ifdef DIMENSION_6x4
+#ifdef DIMENSION_6x5
+byte buttons[NUMROWS][NUMCOLS] = {
+  {0,1,2,3,4},
+  {5,6,7,8,9},
+  {10,11,12,13,14},
+  {15,16,17,18,19},
+  {20,21,22,23,24},
+  {25,26,27,28,29},
+};
+#elseif DIMENSION_6x4
 byte buttons[NUMROWS][NUMCOLS] = {
   {0,1,2,3},
   {4,5,6,7},
