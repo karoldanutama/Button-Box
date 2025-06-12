@@ -9,20 +9,22 @@
 
 #define DIMENSION_6x5
 #define ENABLE_PULLUPS
-#define NUMBUTTONS 24
 
 #if defined(DIMENSION_6x5)
 #define NUMROWS 6
 #define NUMCOLS 5
 #define NUMROTARIES 3
+#define NUMBUTTONS 26
 #elif defined(DIMENSION_6x4)
 #define NUMROWS 6
 #define NUMCOLS 4
 #define NUMROTARIES 4
+#define NUMBUTTONS 24
 #else
 #define NUMROWS 5
 #define NUMCOLS 5
 #define NUMROTARIES 4
+#define NUMBUTTONS 25
 #endif
 
 #define BUTTON_PRESS_DURATION 50  // -1 for original behavior, positive value for momentary press duration in ms
