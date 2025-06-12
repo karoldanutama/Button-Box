@@ -9,18 +9,20 @@
 
 #define DIMENSION_5x5
 #define ENABLE_PULLUPS
-#define NUMROTARIES 4
 #define NUMBUTTONS 24
 
 #ifdef DIMENSION_6x5
 #define NUMROWS 5
 #define NUMCOLS 5
+#define NUMROTARIES 3
 #elseif DIMENSION_6x4
 #define NUMROWS 6
 #define NUMCOLS 4
+#define NUMROTARIES 4
 #else
 #define NUMROWS 5
 #define NUMCOLS 5
+#define NUMROTARIES 4
 #endif
 
 #define BUTTON_PRESS_DURATION -1  // -1 for original behavior, positive value for momentary press duration in ms
@@ -32,7 +34,7 @@ byte buttons[NUMROWS][NUMCOLS] = {
   {10,11,12,13,14},
   {15,16,17,18,19},
   {20,21,22,23,24},
-  {25,26,27,28,29},
+  {25},
 };
 #elseif DIMENSION_6x4
 byte buttons[NUMROWS][NUMCOLS] = {
@@ -61,12 +63,20 @@ struct rotariesdef {
   volatile unsigned char state;
 };
 
+#ifdef DIMENSION_6x5
+rotariesdef rotaries[NUMROTARIES] {
+  {0,1,26,27,0},
+  {2,3,28,29,0},
+  {4,5,30,31,0},
+};
+#else
 rotariesdef rotaries[NUMROTARIES] {
   {0,1,24,25,0},
   {2,3,26,27,0},
   {4,5,28,29,0},
   {6,7,30,31,0},
 };
+#endif
 
 #define DIR_CCW 0x10
 #define DIR_CW 0x20
