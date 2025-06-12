@@ -13,6 +13,7 @@
 #define NUMROWS 5
 #define NUMCOLS 5
 #define DIMENSION_5x5
+#define BUTTON_PRESS_DURATION 100  // Duration in milliseconds
 
 #ifdef DIMENSION_6x4
 byte buttons[NUMROWS][NUMCOLS] = {
@@ -113,6 +114,9 @@ Joystick_ Joystick(JOYSTICK_DEFAULT_REPORT_ID,
   false, false, false, false, false, false,
   false, false, false, false, false);
 
+// Add timestamp array for button press tracking
+unsigned long buttonPressTimes[NUMBUTTONS] = {0};
+
 void setup() {
   Joystick.begin();
   rotary_init();}
@@ -126,25 +130,29 @@ void loop() {
 }
 
 void CheckAllButtons(void) {
-      if (buttbx.getKeys())
-    {
-       for (int i=0; i<LIST_MAX; i++)   
-        {
-           if ( buttbx.key[i].stateChanged )   
-            {
-            switch (buttbx.key[i].kstate) {  
-                    case PRESSED:
-                    case HOLD:
-                              Joystick.setButton(buttbx.key[i].kchar, 1);
-                              break;
-                    case RELEASED:
-                    case IDLE:
-                              Joystick.setButton(buttbx.key[i].kchar, 0);
-                              break;
+  if (buttbx.getKeys()) {
+    for (int i=0; i<LIST_MAX; i++) {
+      if (buttbx.key[i].stateChanged) {
+        switch (buttbx.key[i].kstate) {
+          case PRESSED:
+            // Record the time when button is pressed
+            buttonPressTimes[buttbx.key[i].kchar] = millis();
+            Joystick.setButton(buttbx.key[i].kchar, 1);
+            break;
+          case HOLD:
+            // Check if we need to release the button
+            if (millis() - buttonPressTimes[buttbx.key[i].kchar] >= BUTTON_PRESS_DURATION) {
+              Joystick.setButton(buttbx.key[i].kchar, 0);
             }
-           }   
-         }
-     }
+            break;
+          case RELEASED:
+          case IDLE:
+            Joystick.setButton(buttbx.key[i].kchar, 0);
+            break;
+        }
+      }
+    }
+  }
 }
 
 
