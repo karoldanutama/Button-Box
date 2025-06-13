@@ -32,7 +32,7 @@
 #define EEPROM_BUTTON_DURATION_ADDR 0
 
 // Button assignments
-#define TOGGLE_BUTTON_DURATION_BTN 17
+#define TOGGLE_BUTTON_DURATION_BTN 18
 
 // Initial button press duration (will be overridden by EEPROM value if it exists)
 int buttonPressDuration = 50;  // -1 for original behavior, positive value for momentary press duration in ms
@@ -159,9 +159,19 @@ Joystick_ Joystick(JOYSTICK_DEFAULT_REPORT_ID,
 // Add timestamp array for button press tracking
 unsigned long buttonPressTimes[NUMBUTTONS] = {0};
 
+void blinkLED(int times) {
+  for (int i = 0; i < times; i++) {
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(200);
+    digitalWrite(LED_BUILTIN, LOW);
+    delay(200);
+  }
+}
+
 void setup() {
   Joystick.begin();
   rotary_init();
+  pinMode(LED_BUILTIN, OUTPUT);
   
   // Read button press duration from EEPROM
   int storedDuration = EEPROM.read(EEPROM_BUTTON_DURATION_ADDR);
@@ -187,6 +197,8 @@ void CheckAllButtons(void) {
               buttonPressDuration = (buttonPressDuration == -1) ? 50 : -1;
               // Save to EEPROM
               EEPROM.write(EEPROM_BUTTON_DURATION_ADDR, buttonPressDuration);
+              // Blink LED three times to indicate change
+              blinkLED(3);
               // Don't send button press for the toggle button
               continue;
             }
