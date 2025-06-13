@@ -6,6 +6,7 @@
 
 #include <Keypad.h>
 #include <Joystick.h>
+#include <EEPROM.h>
 
 #define DIMENSION_6x5
 #define ENABLE_PULLUPS
@@ -27,7 +28,14 @@
 #define NUMBUTTONS 25
 #endif
 
-#define BUTTON_PRESS_DURATION 50  // -1 for original behavior, positive value for momentary press duration in ms
+// EEPROM address for storing button press duration
+#define EEPROM_BUTTON_DURATION_ADDR 0
+
+// Button assignments
+#define TOGGLE_BUTTON_DURATION_BTN 17
+
+// Initial button press duration (will be overridden by EEPROM value if it exists)
+int buttonPressDuration = 50;  // -1 for original behavior, positive value for momentary press duration in ms
 
 #if defined(DIMENSION_6x5)
 byte buttons[NUMROWS][NUMCOLS] = {
@@ -153,14 +161,18 @@ unsigned long buttonPressTimes[NUMBUTTONS] = {0};
 
 void setup() {
   Joystick.begin();
-  rotary_init();}
+  rotary_init();
+  
+  // Read button press duration from EEPROM
+  int storedDuration = EEPROM.read(EEPROM_BUTTON_DURATION_ADDR);
+  if (storedDuration != 255) { // 255 is the default uninitialized EEPROM value
+    buttonPressDuration = storedDuration;
+  }
+}
 
 void loop() { 
-
   CheckAllEncoders();
-
   CheckAllButtons();
-
 }
 
 void CheckAllButtons(void) {
@@ -169,14 +181,24 @@ void CheckAllButtons(void) {
       if (buttbx.key[i].stateChanged) {
         switch (buttbx.key[i].kstate) {
           case PRESSED:
+            // Special handling for toggle button
+            if (buttbx.key[i].kchar == TOGGLE_BUTTON_DURATION_BTN) {
+              // Toggle between -1 and 50
+              buttonPressDuration = (buttonPressDuration == -1) ? 50 : -1;
+              // Save to EEPROM
+              EEPROM.write(EEPROM_BUTTON_DURATION_ADDR, buttonPressDuration);
+              // Don't send button press for the toggle button
+              continue;
+            }
+            
             // Record the time when button is pressed
             buttonPressTimes[buttbx.key[i].kchar] = millis();
             Joystick.setButton(buttbx.key[i].kchar, 1);
             break;
           case HOLD:
-            // Only auto-release if BUTTON_PRESS_DURATION is not -1
-            if (BUTTON_PRESS_DURATION > 0 && 
-                millis() - buttonPressTimes[buttbx.key[i].kchar] >= BUTTON_PRESS_DURATION) {
+            // Only auto-release if buttonPressDuration is not -1
+            if (buttonPressDuration > 0 && 
+                millis() - buttonPressTimes[buttbx.key[i].kchar] >= buttonPressDuration) {
               Joystick.setButton(buttbx.key[i].kchar, 0);
             }
             break;
@@ -190,7 +212,6 @@ void CheckAllButtons(void) {
   }
 }
 
-
 void rotary_init() {
   for (int i=0;i<NUMROTARIES;i++) {
     pinMode(rotaries[i].pin1, INPUT);
@@ -201,7 +222,6 @@ void rotary_init() {
     #endif
   }
 }
-
 
 unsigned char rotary_process(int _i) {
    unsigned char pinstate = (digitalRead(rotaries[_i].pin2) << 1) | digitalRead(rotaries[_i].pin1);
