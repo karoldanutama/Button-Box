@@ -33,7 +33,7 @@
 
 // Button assignments
 #define TOGGLE_BUTTON_DURATION_BTN 18
-#define TOGGLE_HOLD_DURATION 3000  // Hold duration in ms for toggling button mode
+#define TOGGLE_HOLD_DURATION 450  // Hold duration in ms for toggling button mode
 
 // Initial button press duration (will be overridden by EEPROM value if it exists)
 int buttonPressDuration = 50;  // -1 for original behavior, positive value for momentary press duration in ms
