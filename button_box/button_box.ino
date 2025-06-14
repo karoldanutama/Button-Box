@@ -8,6 +8,9 @@
 #include <Joystick.h>
 #include <EEPROM.h>
 
+// Controller Configuration
+#define CONTROLLER_ID 2  // Change this to 1 for the second controller, 2 for third, etc.
+
 #define DIMENSION_5x5
 #define ENABLE_PULLUPS
 
@@ -154,7 +157,7 @@ byte colPins[NUMCOLS] = {14,16,10,9,8};
 
 Keypad buttbx = Keypad( makeKeymap(buttons), rowPins, colPins, NUMROWS, NUMCOLS); 
 
-Joystick_ Joystick(JOYSTICK_DEFAULT_REPORT_ID, 
+Joystick_ Joystick(JOYSTICK_DEFAULT_REPORT_ID + CONTROLLER_ID, 
   JOYSTICK_TYPE_JOYSTICK, 32, 0,
   false, false, false, false, false, false,
   false, false, false, false, false);
