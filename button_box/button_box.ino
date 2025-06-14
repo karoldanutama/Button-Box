@@ -8,7 +8,7 @@
 #include <Joystick.h>
 #include <EEPROM.h>
 
-#define DIMENSION_6x4
+#define DIMENSION_5x5
 #define ENABLE_PULLUPS
 
 #if defined(DIMENSION_6x5)
@@ -33,10 +33,12 @@
 
 // Button assignments
 #define TOGGLE_BUTTON_DURATION_BTN 18
-#define TOGGLE_HOLD_DURATION 450  // Hold duration in ms for toggling button mode
+#define TOGGLE_HOLD_DURATION 3000  // Hold duration in ms for toggling button mode
 
+
+#define DEFAULT_PRESS_HOLD 50
 // Initial button press duration (will be overridden by EEPROM value if it exists)
-int buttonPressDuration = 50;  // -1 for original behavior, positive value for momentary press duration in ms
+int buttonPressDuration = DEFAULT_PRESS_HOLD;  // -1 for original behavior, positive value for momentary press duration in ms
 
 #if defined(DIMENSION_6x5)
 byte buttons[NUMROWS][NUMCOLS] = {
@@ -196,9 +198,6 @@ void CheckAllButtons(void) {
             buttonPressTimes[buttbx.key[i].kchar] = millis();
             Joystick.setButton(buttbx.key[i].kchar, 1);
             break;
-          case HOLD:
-            Joystick.setButton(buttbx.key[i].kchar, 1);
-            break;
           case RELEASED:
           case IDLE:
             Joystick.setButton(buttbx.key[i].kchar, 0);
@@ -208,27 +207,27 @@ void CheckAllButtons(void) {
     }
   }
 
-  // Check for toggle button hold duration
-  if (buttbx.isPressed(TOGGLE_BUTTON_DURATION_BTN)) {
-    unsigned long currentTime = millis();
-    if (currentTime - buttonPressTimes[TOGGLE_BUTTON_DURATION_BTN] >= TOGGLE_HOLD_DURATION) {
-      // Toggle between -1 and 50
-      buttonPressDuration = (buttonPressDuration == -1) ? 50 : -1;
-      // Save to EEPROM
-      EEPROM.write(EEPROM_BUTTON_DURATION_ADDR, buttonPressDuration);
-      // Blink LED three times to indicate change
-      blinkLED(3);
-      // Reset the press time to prevent multiple toggles
-      buttonPressTimes[TOGGLE_BUTTON_DURATION_BTN] = currentTime;
-    }
-  }
-
   // Check for auto-release on all pressed buttons
-  for (int i=0; i<NUMBUTTONS; i++) {
-    if (buttbx.isPressed(i) && buttonPressDuration > 0) {
-      if (millis() - buttonPressTimes[i] >= buttonPressDuration) {
-        Joystick.setButton(i, 0);
-      }
+  for (int i=0; i<LIST_MAX; i++) {
+    switch (buttbx.key[i].kstate) {
+      case HOLD:
+        if (buttbx.key[i].kchar == TOGGLE_BUTTON_DURATION_BTN) {
+          if (millis() - buttonPressTimes[buttbx.key[i].kchar] >= TOGGLE_HOLD_DURATION) {
+            // Toggle between -1 and 50
+            buttonPressDuration = (buttonPressDuration == -1) ? DEFAULT_PRESS_HOLD : -1;
+            // Save to EEPROM
+            EEPROM.write(EEPROM_BUTTON_DURATION_ADDR, buttonPressDuration);
+            // Blink LED three times to indicate change
+            blinkLED(3);
+            // Reset the press time to prevent multiple toggles
+            buttonPressTimes[buttbx.key[i].kchar] = millis();
+          }
+        } else if (buttonPressDuration > 0) {
+          if (millis() - buttonPressTimes[buttbx.key[i].kchar] >= buttonPressDuration) {
+            Joystick.setButton(buttbx.key[i].kchar, 0);
+          }
+        }
+        break;
     }
   }
 }
