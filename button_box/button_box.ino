@@ -197,30 +197,37 @@ void CheckAllButtons(void) {
             Joystick.setButton(buttbx.key[i].kchar, 1);
             break;
           case HOLD:
-            // Special handling for toggle button - only toggle after 3 seconds
-            if (buttbx.key[i].kchar == TOGGLE_BUTTON_DURATION_BTN) {
-              if (millis() - buttonPressTimes[buttbx.key[i].kchar] >= TOGGLE_HOLD_DURATION) {
-                // Toggle between -1 and 50
-                buttonPressDuration = (buttonPressDuration == -1) ? 50 : -1;
-                // Save to EEPROM
-                EEPROM.write(EEPROM_BUTTON_DURATION_ADDR, buttonPressDuration);
-                // Blink LED three times to indicate change
-                blinkLED(3);
-                // Reset the press time to prevent multiple toggles
-                buttonPressTimes[buttbx.key[i].kchar] = millis();
-              }
-            }
-            // Only auto-release if buttonPressDuration is not -1
-            else if (buttonPressDuration > 0 && 
-                millis() - buttonPressTimes[buttbx.key[i].kchar] >= buttonPressDuration) {
-              Joystick.setButton(buttbx.key[i].kchar, 0);
-            }
+            Joystick.setButton(buttbx.key[i].kchar, 1);
             break;
           case RELEASED:
           case IDLE:
             Joystick.setButton(buttbx.key[i].kchar, 0);
             break;
         }
+      }
+    }
+  }
+
+  // Check for toggle button hold duration
+  if (buttbx.isPressed(TOGGLE_BUTTON_DURATION_BTN)) {
+    unsigned long currentTime = millis();
+    if (currentTime - buttonPressTimes[TOGGLE_BUTTON_DURATION_BTN] >= TOGGLE_HOLD_DURATION) {
+      // Toggle between -1 and 50
+      buttonPressDuration = (buttonPressDuration == -1) ? 50 : -1;
+      // Save to EEPROM
+      EEPROM.write(EEPROM_BUTTON_DURATION_ADDR, buttonPressDuration);
+      // Blink LED three times to indicate change
+      blinkLED(3);
+      // Reset the press time to prevent multiple toggles
+      buttonPressTimes[TOGGLE_BUTTON_DURATION_BTN] = currentTime;
+    }
+  }
+
+  // Check for auto-release on all pressed buttons
+  for (int i=0; i<NUMBUTTONS; i++) {
+    if (buttbx.isPressed(i) && buttonPressDuration > 0) {
+      if (millis() - buttonPressTimes[i] >= buttonPressDuration) {
+        Joystick.setButton(i, 0);
       }
     }
   }
