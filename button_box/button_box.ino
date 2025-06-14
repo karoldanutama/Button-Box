@@ -11,12 +11,14 @@
 // Controller Configuration
 #define CONTROLLER_ID 2  // Change this to 1 for the second controller, 2 for third, etc.
 
-#define DIMENSION_5x5
+#define DIMENSION_3x11
 #define ENABLE_PULLUPS
 
+#define MAX_ROTARIES 4 // Max number of rotaries
+
 #if defined(DIMENSION_3x11)
-#define NUMROWS 11
-#define NUMCOLS 3
+#define NUMROWS 3
+#define NUMCOLS 11
 #define NUMROTARIES 0
 #define NUMBUTTONS 32
 #elif defined(DIMENSION_6x5)
@@ -90,22 +92,12 @@ struct rotariesdef {
   volatile unsigned char state;
 };
 
-#if defined(DIMENSION_3x11)
-rotariesdef rotaries[NUMROTARIES] {};
-#elif defined(DIMENSION_6x5)
-rotariesdef rotaries[NUMROTARIES] {
-  {0,1,26,27,0},
-  {2,3,28,29,0},
-  {4,5,30,31,0},
-};
-#else
-rotariesdef rotaries[NUMROTARIES] {
+rotariesdef rotaries[MAX_ROTARIES] = {
   {0,1,24,25,0},
   {2,3,26,27,0},
   {4,5,28,29,0},
   {6,7,30,31,0},
 };
-#endif
 
 #define DIR_CCW 0x10
 #define DIR_CW 0x20
@@ -158,8 +150,8 @@ const unsigned char ttable[7][4] = {
 #endif
 
 #if defined(DIMENSION_3x11)
-byte rowPins[NUMROWS] = {21,20,19,18,15,14,8,7,6,5,4}; 
-byte colPins[NUMCOLS] = {16,10,9};
+byte rowPins[NUMROWS] = {21,20,19}; 
+byte colPins[NUMCOLS] = {18,15,16,10,9,8,7,6,5,4,3};
 #elif defined(DIMENSION_6x5)
 byte rowPins[NUMROWS] = {21,20,19,18,15,14}; 
 byte colPins[NUMCOLS] = {16,10,9,8,7}; 
