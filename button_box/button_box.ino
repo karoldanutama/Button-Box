@@ -14,7 +14,12 @@
 #define DIMENSION_5x5
 #define ENABLE_PULLUPS
 
-#if defined(DIMENSION_6x5)
+#if defined(DIMENSION_3x11)
+#define NUMROWS 11
+#define NUMCOLS 3
+#define NUMROTARIES 0
+#define NUMBUTTONS 32
+#elif defined(DIMENSION_6x5)
 #define NUMROWS 6
 #define NUMCOLS 5
 #define NUMROTARIES 3
@@ -43,7 +48,13 @@
 // Initial button press duration (will be overridden by EEPROM value if it exists)
 int buttonPressDuration = DEFAULT_PRESS_HOLD;  // -1 for original behavior, positive value for momentary press duration in ms
 
-#if defined(DIMENSION_6x5)
+#if defined(DIMENSION_3x11)
+byte buttons[NUMROWS][NUMCOLS] = {
+  {0,1,2,3,4,5,6,7,8,9,10},
+  {11,12,13,14,15,16,17,18,19,20,21},
+  {22,23,24,25,26,27,28,29,30,31},
+};
+#elif defined(DIMENSION_6x5)
 byte buttons[NUMROWS][NUMCOLS] = {
   {0,1,2,3,4},
   {5,6,7,8,9},
@@ -79,7 +90,9 @@ struct rotariesdef {
   volatile unsigned char state;
 };
 
-#ifdef DIMENSION_6x5
+#if defined(DIMENSION_3x11)
+rotariesdef rotaries[NUMROTARIES] {};
+#elif defined(DIMENSION_6x5)
 rotariesdef rotaries[NUMROTARIES] {
   {0,1,26,27,0},
   {2,3,28,29,0},
@@ -144,7 +157,10 @@ const unsigned char ttable[7][4] = {
 };
 #endif
 
-#if defined(DIMENSION_6x5)
+#if defined(DIMENSION_3x11)
+byte rowPins[NUMROWS] = {21,20,19,18,15,14,8,7,6,5,4}; 
+byte colPins[NUMCOLS] = {16,10,9};
+#elif defined(DIMENSION_6x5)
 byte rowPins[NUMROWS] = {21,20,19,18,15,14}; 
 byte colPins[NUMCOLS] = {16,10,9,8,7}; 
 #elif defined(DIMENSION_6x4)
