@@ -9,9 +9,9 @@
 #include <EEPROM.h>
 
 // Controller Configuration
-#define CONTROLLER_ID 2  // Change this to 1 for the second controller, 2 for third, etc.
+#define CONTROLLER_ID 0  // Change this to 1 for the second controller, 2 for third, etc.
 
-#define DIMENSION_3x11
+#define DIMENSION_6x4
 #define ENABLE_PULLUPS
 
 #define MAX_ROTARIES 4 // Max number of rotaries
@@ -46,7 +46,7 @@
 #define TOGGLE_HOLD_DURATION 3000  // Hold duration in ms for toggling button mode
 
 
-#define DEFAULT_PRESS_HOLD 50
+#define DEFAULT_PRESS_HOLD -1
 // Initial button press duration (will be overridden by EEPROM value if it exists)
 int buttonPressDuration = DEFAULT_PRESS_HOLD;  // -1 for original behavior, positive value for momentary press duration in ms
 
