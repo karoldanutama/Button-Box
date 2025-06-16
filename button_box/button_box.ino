@@ -11,7 +11,7 @@
 // Controller Configuration
 #define CONTROLLER_ID 0  // Change this to 1 for the second controller, 2 for third, etc.
 
-#define DIMENSION_6x4
+#define DIMENSION_5x5
 #define ENABLE_PULLUPS
 
 #define MAX_ROTARIES 4 // Max number of rotaries
@@ -42,7 +42,7 @@
 #define EEPROM_BUTTON_DURATION_ADDR 0
 
 // Button assignments
-#define TOGGLE_BUTTON_DURATION_BTN 18
+#define TOGGLE_BUTTON_DURATION_BTN 100 /// Disable this function for now
 #define TOGGLE_HOLD_DURATION 3000  // Hold duration in ms for toggling button mode
 
 
@@ -80,7 +80,7 @@ byte buttons[NUMROWS][NUMCOLS] = {
   {5,6,7,8,9},
   {10,11,12,13,14},
   {15,16,17,18,19},
-  {20,21,22,23},
+  {20,21,22,23,20},
 };
 #endif
 
