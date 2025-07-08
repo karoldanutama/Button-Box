@@ -9,9 +9,22 @@
 #include <EEPROM.h>
 
 // Controller Configuration
-#define CONTROLLER_ID 0  // Change this to 1 for the second controller, 2 for third, etc.
+#define CONTROLLER_ID 2  // Change this to 1 for the second controller, 2 for third, etc.
 
-#define DIMENSION_5x5
+// Use completely different report IDs to avoid conflicts
+#if CONTROLLER_ID == 1
+  #define JOYSTICK_REPORT_ID 500
+#elif CONTROLLER_ID == 2
+  #define JOYSTICK_REPORT_ID 510
+#elif CONTROLLER_ID == 3
+  #define JOYSTICK_REPORT_ID 520
+#elif CONTROLLER_ID == 4
+  #define JOYSTICK_REPORT_ID 530
+#else
+  #define JOYSTICK_REPORT_ID 540
+#endif
+
+#define DIMENSION_6x4
 #define ENABLE_PULLUPS
 
 #define MAX_ROTARIES 4 // Max number of rotaries
@@ -165,7 +178,7 @@ byte colPins[NUMCOLS] = {14,16,10,9,8};
 
 Keypad buttbx = Keypad( makeKeymap(buttons), rowPins, colPins, NUMROWS, NUMCOLS); 
 
-Joystick_ Joystick(JOYSTICK_DEFAULT_REPORT_ID + CONTROLLER_ID, 
+Joystick_ Joystick(JOYSTICK_REPORT_ID, 
   JOYSTICK_TYPE_JOYSTICK, 32, 0,
   false, false, false, false, false, false,
   false, false, false, false, false);
