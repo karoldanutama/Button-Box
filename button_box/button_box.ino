@@ -8,8 +8,9 @@
 #include <Joystick.h>
 #include <EEPROM.h>
 
-// Controller Configuration
+// Controller Configuration -- Change this before deploy
 #define CONTROLLER_ID 2  // Change this to 1 for the second controller, 2 for third, etc.
+#define DIMENSION_6x4
 
 // Use completely different report IDs to avoid conflicts
 #if CONTROLLER_ID == 1
@@ -24,7 +25,6 @@
   #define JOYSTICK_REPORT_ID 540
 #endif
 
-#define DIMENSION_6x4
 #define ENABLE_PULLUPS
 
 #define MAX_ROTARIES 4 // Max number of rotaries
@@ -44,6 +44,11 @@
 #define NUMCOLS 4
 #define NUMROTARIES 4
 #define NUMBUTTONS 24
+#elif defined(DIMENSION_7x3)
+#define NUMROWS 7
+#define NUMCOLS 3
+#define NUMROTARIES 4
+#define NUMBUTTONS 21
 #else
 #define NUMROWS 5
 #define NUMCOLS 5
@@ -86,6 +91,16 @@ byte buttons[NUMROWS][NUMCOLS] = {
   {12,13,14,15},
   {16,17,18,19},
   {20,21,22,23},
+};
+#elif defined(DIMENSION_7x3)
+byte buttons[NUMROWS][NUMCOLS] = {
+  {0,1,2},
+  {3,4,5},
+  {6,7,8},
+  {9,10,11},
+  {12,13,14},
+  {15,16,17},
+  {18,19,20},
 };
 #else
 byte buttons[NUMROWS][NUMCOLS] = {
@@ -171,6 +186,9 @@ byte colPins[NUMCOLS] = {16,10,9,8,7};
 #elif defined(DIMENSION_6x4)
 byte rowPins[NUMROWS] = {21,20,19,18,15,14}; 
 byte colPins[NUMCOLS] = {16,10,9,8}; 
+#elif defined(DIMENSION_7x3)
+byte rowPins[NUMROWS] = {21,20,19,18,15,14,16}; 
+byte colPins[NUMCOLS] = {10,9,8}; 
 #else
 byte rowPins[NUMROWS] = {21,20,19,18,15}; 
 byte colPins[NUMCOLS] = {14,16,10,9,8}; 
