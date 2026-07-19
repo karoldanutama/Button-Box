@@ -4,12 +4,21 @@
 //AMSTUDIO
 //20.8.17
 //
-// --- MODIFIED: firmware-native shift/chording layer added ---
-// One physical button acts as a hardware "shift" key. While held, every other
-// button AND all 4 rotary encoders output a second, distinct set of joystick
-// button numbers. This replaces AntiMicroX's Sets feature entirely -- the
-// layer logic now lives on the microcontroller, so it works the instant you
-// plug in, with no PC-side software running.
+// --- MODIFIED: 3-layer system driven by a single 3-way toggle switch ---
+// The toggle's two throw contacts are wired into the button matrix at
+// LAYER2_BUTTON_INDEX and LAYER3_BUTTON_INDEX. Because it's a mechanical
+// SPDT toggle (not two separate buttons), only one throw can ever be active
+// at a time -- the third (center) position leaves both open, which is
+// Layer 1 by default. No priority/tie-break logic is needed; the hardware
+// itself guarantees mutual exclusivity.
+//
+// These two positions are silent modifiers: flipping the switch selects a
+// layer but never fires a joystick button press itself (a toggle switch
+// staying "on" for a whole layer shouldn't also hold a button down the
+// entire time).
+//
+// Fixed a pre-existing bug in the 5x5 button map: the last row repeated
+// "20" instead of using "24", meaning physical button 24 never worked.
 
 #include <Keypad.h>
 #include <Joystick.h>
@@ -55,6 +64,11 @@
   #define NUMCOLS 3
   #define NUMROTARIES 4
   #define NUMBUTTONS 21
+#elif defined(DIMENSION_5x5)
+  #define NUMROWS 5
+  #define NUMCOLS 5
+  #define NUMROTARIES 4
+  #define NUMBUTTONS 25
 #else
   #define NUMROWS 5
   #define NUMCOLS 5
@@ -62,20 +76,22 @@
   #define NUMBUTTONS 25
 #endif
 
-// --- SHIFT LAYER CONFIG ---
-// Physical matrix button that acts as the shift/modifier key.
-// Default: button 23 = bottom-right button of the 6x4 matrix.
-// Change this if you'd rather use a different physical button.
-#define SHIFT_BUTTON_INDEX 8
+// --- LAYER CONFIG ---
+// Matrix positions wired to the two throw contacts of the 3-way toggle.
+// Neither position ever fires its own joystick button -- see note above.
+#define LAYER2_BUTTON_INDEX 8
+#define LAYER3_BUTTON_INDEX 16
 
-// Layer offset: unshifted matrix buttons output 0..NUMBUTTONS-1 as normal.
-// Shifted matrix buttons output (kchar + LAYER_OFFSET) instead.
-#define LAYER_OFFSET 24
+// Number of matrix buttons that actually produce output: all 25 physical
+// positions minus the 2 dedicated to the layer-select toggle.
+#define NUM_ACTIVE_BUTTONS (NUMBUTTONS - 2)
 
-// Total joystick buttons needed: 24 (layer 1) + 24 (layer 2) + 8 encoder
-// codes (layer 1) + 8 encoder codes (layer 2) = 64. Well within the
-// Joystick library's tested range of up to 128.
-#define TOTAL_JOYSTICK_BUTTONS 64
+// Output numbering:
+//   Matrix buttons: 0..(NUM_ACTIVE_BUTTONS*3 - 1)   => 0-68  (23 per layer)
+//   Encoders:       ENCODER_BASE..ENCODER_BASE+23   => 69-92 (8 per layer)
+// Total used: 93. Declared to the Joystick library as 96 for headroom.
+#define ENCODER_BASE (NUM_ACTIVE_BUTTONS * 3)
+#define TOTAL_JOYSTICK_BUTTONS 96
 
 // EEPROM address for storing button press duration
 #define EEPROM_BUTTON_DURATION_ADDR 0
@@ -123,32 +139,36 @@ byte buttons[NUMROWS][NUMCOLS] = {
   {18,19,20},
 };
 #else
+// Covers DIMENSION_5x5 and the default fallback.
+// Fixed: last row was previously {20,21,22,23,20} -- duplicate "20" meant
+// physical button 24 never worked. Now correctly {20,21,22,23,24}.
 byte buttons[NUMROWS][NUMCOLS] = {
   {0,1,2,3,4},
   {5,6,7,8,9},
   {10,11,12,13,14},
   {15,16,17,18,19},
-  {20,21,22,23,20},
+  {20,21,22,23,24},
 };
 #endif
 
 struct rotariesdef {
   byte pin1;
   byte pin2;
-  int ccwchar;      // layer 1 (unshifted) CCW output
-  int cwchar;       // layer 1 (unshifted) CW output
-  int ccwchar2;      // layer 2 (shifted) CCW output
-  int cwchar2;       // layer 2 (shifted) CW output
+  int ccwchar1; // layer 1 CCW output
+  int cwchar1;  // layer 1 CW output
+  int ccwchar2; // layer 2 CCW output
+  int cwchar2;  // layer 2 CW output
+  int ccwchar3; // layer 3 CCW output
+  int cwchar3;  // layer 3 CW output
   volatile unsigned char state;
 };
 
-// Renumbered so encoder outputs (48-63) never collide with matrix button
-// outputs (0-47, covering both layers of the 24 physical buttons).
+// Encoder outputs occupy ENCODER_BASE..ENCODER_BASE+23 (69-92), 8 codes per layer.
 rotariesdef rotaries[MAX_ROTARIES] = {
-  {0,1, 48,49, 56,57, 0},
-  {2,3, 50,51, 58,59, 0},
-  {4,5, 52,53, 60,61, 0},
-  {6,7, 54,55, 62,63, 0},
+  {0,1, ENCODER_BASE+0,  ENCODER_BASE+1,  ENCODER_BASE+8,  ENCODER_BASE+9,  ENCODER_BASE+16, ENCODER_BASE+17, 0},
+  {2,3, ENCODER_BASE+2,  ENCODER_BASE+3,  ENCODER_BASE+10, ENCODER_BASE+11, ENCODER_BASE+18, ENCODER_BASE+19, 0},
+  {4,5, ENCODER_BASE+4,  ENCODER_BASE+5,  ENCODER_BASE+12, ENCODER_BASE+13, ENCODER_BASE+20, ENCODER_BASE+21, 0},
+  {6,7, ENCODER_BASE+6,  ENCODER_BASE+7,  ENCODER_BASE+14, ENCODER_BASE+15, ENCODER_BASE+22, ENCODER_BASE+23, 0},
 };
 
 #define DIR_CCW 0x10
@@ -213,6 +233,7 @@ byte colPins[NUMCOLS] = {16,10,9,8};
 byte rowPins[NUMROWS] = {21,20,19,18,15,14,16};
 byte colPins[NUMCOLS] = {10,9,8};
 #else
+// Covers DIMENSION_5x5 and the default fallback. Unchanged from original wiring.
 byte rowPins[NUMROWS] = {21,20,19,18,15};
 byte colPins[NUMCOLS] = {14,16,10,9,8};
 #endif
@@ -228,12 +249,20 @@ Joystick_ Joystick(JOYSTICK_REPORT_ID,
 unsigned long buttonPressTimes[NUMBUTTONS] = {0};
 
 // Tracks the actual joystick output button each physical key most recently
-// pressed, so a release always clears the correct one -- even if the shift
-// key is pressed or released mid-press on another button. 255 = none active.
+// pressed, so a release always clears the correct one -- even if the layer
+// changes mid-press. 255 = none active.
 byte activeOutputButton[NUMBUTTONS];
 
-// True while the shift button is physically held down.
-bool shiftActive = false;
+// Maps each physical kchar (0..NUMBUTTONS-1) to a compact 0..NUM_ACTIVE_BUTTONS-1
+// output slot. 255 = this kchar is a layer-select modifier and never outputs.
+// Built once in setup() from LAYER2_BUTTON_INDEX / LAYER3_BUTTON_INDEX.
+byte outputSlotForKchar[NUMBUTTONS];
+
+// Current active layer: 1, 2, or 3. Recomputed once per loop() from the
+// live state of the toggle switch's two throw positions. Since it's a
+// mechanical SPDT toggle, only one can ever be active -- this is a plain
+// read, not a priority contest.
+int currentLayer = 1;
 
 void blinkLED(int times) {
   for (int i = 0; i < times; i++) {
@@ -253,6 +282,18 @@ void setup() {
     activeOutputButton[i] = 255;
   }
 
+  // Build the compact output-slot mapping, skipping the two selector kchars.
+  byte nextSlot = 0;
+  for (int kc = 0; kc < NUMBUTTONS; kc++) {
+    if (kc == LAYER2_BUTTON_INDEX || kc == LAYER3_BUTTON_INDEX) {
+      outputSlotForKchar[kc] = 255;
+    } else {
+      outputSlotForKchar[kc] = nextSlot;
+      nextSlot++;
+    }
+  }
+  // nextSlot should now equal NUM_ACTIVE_BUTTONS.
+
   // Read button press duration from EEPROM
   int storedDuration = EEPROM.read(EEPROM_BUTTON_DURATION_ADDR);
   if (storedDuration != 255) { // 255 is the default uninitialized EEPROM value
@@ -261,49 +302,67 @@ void setup() {
 }
 
 void loop() {
+  buttbx.getKeys(); // scan matrix once per loop; both functions below read the result
+  UpdateLayer();
   CheckAllEncoders();
   CheckAllButtons();
 }
 
+// Reads the toggle switch's two throw positions and sets currentLayer.
+// Mechanically exclusive -- both can never read HOLD/PRESSED at once --
+// but the else-chain below is written defensively regardless.
+void UpdateLayer() {
+  bool layer2Thrown = false;
+  bool layer3Thrown = false;
+
+  for (int i=0; i<LIST_MAX; i++) {
+    int kchar = buttbx.key[i].kchar;
+    KeyState ks = buttbx.key[i].kstate;
+    if (kchar == LAYER2_BUTTON_INDEX && (ks == PRESSED || ks == HOLD)) {
+      layer2Thrown = true;
+    }
+    if (kchar == LAYER3_BUTTON_INDEX && (ks == PRESSED || ks == HOLD)) {
+      layer3Thrown = true;
+    }
+  }
+
+  if (layer3Thrown) {
+    currentLayer = 3;
+  } else if (layer2Thrown) {
+    currentLayer = 2;
+  } else {
+    currentLayer = 1;
+  }
+}
+
 void CheckAllButtons(void) {
-  if (buttbx.getKeys()) {
-    for (int i=0; i<LIST_MAX; i++) {
-      if (buttbx.key[i].stateChanged) {
-        int kchar = buttbx.key[i].kchar;
+  for (int i=0; i<LIST_MAX; i++) {
+    if (buttbx.key[i].stateChanged) {
+      int kchar = buttbx.key[i].kchar;
 
-        // The shift button itself never sends a joystick press -- it only
-        // toggles which layer everything else maps to.
-        if (kchar == SHIFT_BUTTON_INDEX) {
-          switch (buttbx.key[i].kstate) {
-            case PRESSED:
-            case HOLD:
-              shiftActive = true;
-              break;
-            case RELEASED:
-            case IDLE:
-              shiftActive = false;
-              break;
-          }
-          continue;
+      // Layer-select positions never fire a joystick button themselves.
+      if (kchar == LAYER2_BUTTON_INDEX || kchar == LAYER3_BUTTON_INDEX) {
+        continue;
+      }
+
+      byte slot = outputSlotForKchar[kchar];
+
+      switch (buttbx.key[i].kstate) {
+        case PRESSED: {
+          // Record the time when button is pressed
+          buttonPressTimes[kchar] = millis();
+          int outputButton = slot + (currentLayer - 1) * NUM_ACTIVE_BUTTONS;
+          activeOutputButton[kchar] = outputButton;
+          Joystick.setButton(outputButton, 1);
+          break;
         }
-
-        switch (buttbx.key[i].kstate) {
-          case PRESSED: {
-            // Record the time when button is pressed
-            buttonPressTimes[kchar] = millis();
-            int outputButton = shiftActive ? (kchar + LAYER_OFFSET) : kchar;
-            activeOutputButton[kchar] = outputButton;
-            Joystick.setButton(outputButton, 1);
-            break;
+        case RELEASED:
+        case IDLE: {
+          if (activeOutputButton[kchar] != 255) {
+            Joystick.setButton(activeOutputButton[kchar], 0);
+            activeOutputButton[kchar] = 255;
           }
-          case RELEASED:
-          case IDLE: {
-            if (activeOutputButton[kchar] != 255) {
-              Joystick.setButton(activeOutputButton[kchar], 0);
-              activeOutputButton[kchar] = 255;
-            }
-            break;
-          }
+          break;
         }
       }
     }
@@ -312,7 +371,7 @@ void CheckAllButtons(void) {
   // Check for auto-release on all pressed buttons
   for (int i=0; i<LIST_MAX; i++) {
     int kchar = buttbx.key[i].kchar;
-    if (kchar == SHIFT_BUTTON_INDEX) continue;
+    if (kchar == LAYER2_BUTTON_INDEX || kchar == LAYER3_BUTTON_INDEX) continue;
 
     switch (buttbx.key[i].kstate) {
       case HOLD:
@@ -360,8 +419,12 @@ unsigned char rotary_process(int _i) {
 void CheckAllEncoders(void) {
   for (int i=0;i<NUMROTARIES;i++) {
     unsigned char result = rotary_process(i);
-    int ccw = shiftActive ? rotaries[i].ccwchar2 : rotaries[i].ccwchar;
-    int cw  = shiftActive ? rotaries[i].cwchar2  : rotaries[i].cwchar;
+    int ccw, cw;
+    switch (currentLayer) {
+      case 2:  ccw = rotaries[i].ccwchar2; cw = rotaries[i].cwchar2; break;
+      case 3:  ccw = rotaries[i].ccwchar3; cw = rotaries[i].cwchar3; break;
+      default: ccw = rotaries[i].ccwchar1; cw = rotaries[i].cwchar1; break;
+    }
 
     if (result == DIR_CCW) {
       Joystick.setButton(ccw, 1); delay(50); Joystick.setButton(ccw, 0);
