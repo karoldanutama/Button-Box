@@ -80,7 +80,7 @@
 // Matrix positions wired to the two throw contacts of the 3-way toggle.
 // Neither position ever fires its own joystick button -- see note above.
 #define LAYER2_BUTTON_INDEX 8
-#define LAYER3_BUTTON_INDEX 16
+#define LAYER3_BUTTON_INDEX 7
 
 // Number of matrix buttons that actually produce output: all 25 physical
 // positions minus the 2 dedicated to the layer-select toggle.
@@ -294,11 +294,14 @@ void setup() {
   }
   // nextSlot should now equal NUM_ACTIVE_BUTTONS.
 
-  // Read button press duration from EEPROM
-  int storedDuration = EEPROM.read(EEPROM_BUTTON_DURATION_ADDR);
-  if (storedDuration != 255) { // 255 is the default uninitialized EEPROM value
-    buttonPressDuration = storedDuration;
-  }
+  // NOTE: deliberately NOT reading buttonPressDuration from EEPROM here.
+  // The only feature that ever wrote a non-default value to this address
+  // (holding button 100 for 3s) is dead code in this matrix -- button 100
+  // doesn't exist on a 25-button layout, so it can never be re-triggered.
+  // EEPROM survives reflashing, so a stale value from an earlier sketch
+  // variant would otherwise silently turn every button momentary. Buttons
+  // stay pure hold-to-press: buttonPressDuration is fixed at -1.
+  buttonPressDuration = DEFAULT_PRESS_HOLD;
 }
 
 void loop() {
