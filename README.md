@@ -4,6 +4,19 @@ Arduino Pro Micro button box firmware and build assets for a custom sim racing c
 
 This repository started as a fork of AMSTUDIO's 32-function button box project, but the firmware in this repo is now its own implementation track. The current sketch is a layered HID joystick firmware built around a matrix-scanned button panel, rotary encoders, and per-device USB identity management.
 
+## Features
+
+- Arduino Pro Micro / ATmega32U4 HID joystick firmware
+- Default `5x5` matrix configuration with multiple matrix presets in the codebase
+- `3-layer` input model selected by a single 3-way toggle switch
+- Silent layer-selector inputs that do not consume joystick button outputs
+- `4` rotary encoders with per-layer clockwise and counter-clockwise actions
+- Up to `96` declared joystick buttons, with `93` actively used in the default build
+- Compact logical-to-joystick button remapping that skips reserved selector positions
+- Safe button release handling across mid-press layer changes
+- Custom controller report IDs for running multiple boxes on one system
+- Documented USB VID/PID/product-name management workflow via `DEVICES-MANAGEMENT.md`
+
 Credits to the original projects this build was based on:
 
 - [AM-STUDIO / 32-FUNCTION-BUTTON-BOX](https://github.com/AM-STUDIO/32-FUNCTION-BUTTON-BOX)
