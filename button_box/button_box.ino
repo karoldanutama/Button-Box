@@ -100,6 +100,7 @@
 #define TOGGLE_BUTTON_DURATION_BTN 100 /// Disable this function for now
 #define TOGGLE_HOLD_DURATION 3000 // Hold duration in ms for toggling button mode
 #define DEFAULT_PRESS_HOLD -1
+#define LONG_PRESS_DURATION 1500 // Hold duration in ms to promote button to layer 2
 
 // Initial button press duration (will be overridden by EEPROM value if it exists)
 int buttonPressDuration = DEFAULT_PRESS_HOLD; // -1 for original behavior, positive value for momentary press duration in ms
@@ -253,6 +254,8 @@ unsigned long buttonPressTimes[NUMBUTTONS] = {0};
 // changes mid-press. 255 = none active.
 byte activeOutputButton[NUMBUTTONS];
 
+bool buttonLongPressed[NUMBUTTONS];
+
 // Maps each physical kchar (0..NUMBUTTONS-1) to a compact 0..NUM_ACTIVE_BUTTONS-1
 // output slot. 255 = this kchar is a layer-select modifier and never outputs.
 // Built once in setup() from LAYER2_BUTTON_INDEX / LAYER3_BUTTON_INDEX.
@@ -280,6 +283,7 @@ void setup() {
 
   for (int i = 0; i < NUMBUTTONS; i++) {
     activeOutputButton[i] = 255;
+    buttonLongPressed[i] = false;
   }
 
   // Build the compact output-slot mapping, skipping the two selector kchars.
@@ -354,6 +358,7 @@ void CheckAllButtons(void) {
         case PRESSED: {
           // Record the time when button is pressed
           buttonPressTimes[kchar] = millis();
+          buttonLongPressed[kchar] = false;
           int outputButton = slot + (currentLayer - 1) * NUM_ACTIVE_BUTTONS;
           activeOutputButton[kchar] = outputButton;
           Joystick.setButton(outputButton, 1);
@@ -365,6 +370,7 @@ void CheckAllButtons(void) {
             Joystick.setButton(activeOutputButton[kchar], 0);
             activeOutputButton[kchar] = 255;
           }
+          buttonLongPressed[kchar] = false;
           break;
         }
       }
@@ -378,6 +384,17 @@ void CheckAllButtons(void) {
 
     switch (buttbx.key[i].kstate) {
       case HOLD:
+        if (currentLayer != 2 && !buttonLongPressed[kchar]) {
+          if (millis() - buttonPressTimes[kchar] >= LONG_PRESS_DURATION) {
+            if (activeOutputButton[kchar] != 255) {
+              Joystick.setButton(activeOutputButton[kchar], 0);
+            }
+            int layer2Button = outputSlotForKchar[kchar] + (2 - 1) * NUM_ACTIVE_BUTTONS;
+            activeOutputButton[kchar] = layer2Button;
+            Joystick.setButton(layer2Button, 1);
+            buttonLongPressed[kchar] = true;
+          }
+        }
         if (kchar == TOGGLE_BUTTON_DURATION_BTN) {
           if (millis() - buttonPressTimes[kchar] >= TOGGLE_HOLD_DURATION) {
             // Toggle between -1 and 50
