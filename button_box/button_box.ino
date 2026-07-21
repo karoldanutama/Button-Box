@@ -241,6 +241,9 @@ unsigned long buttonPressTimes[NUMBUTTONS] = {0};
 // Output button for sustained long-press, released on keyup. 255 = none active.
 byte activeOutputButton[NUMBUTTONS];
 
+// Explicitly tracks whether a long-press promotion has occurred for this button.
+bool buttonLongPressed[NUMBUTTONS];
+
 // Maps each physical kchar (0..NUMBUTTONS-1) to a compact 0..NUM_ACTIVE_BUTTONS-1
 // output slot. 255 = this kchar is a layer-select modifier and never outputs.
 // Built once in setup() from LAYER2_BUTTON_INDEX / LAYER3_BUTTON_INDEX.
@@ -258,6 +261,7 @@ void setup() {
 
   for (int i = 0; i < NUMBUTTONS; i++) {
     activeOutputButton[i] = 255;
+    buttonLongPressed[i] = false;
   }
 
   // Build the compact output-slot mapping, skipping the two selector kchars.
@@ -322,11 +326,13 @@ void CheckAllButtons(void) {
         case PRESSED:
           buttonPressTimes[kchar] = millis();
           activeOutputButton[kchar] = 255;
+          buttonLongPressed[kchar] = false;
           break;
         case RELEASED: {
-          if (activeOutputButton[kchar] != 255) {
+          if (buttonLongPressed[kchar]) {
             Joystick.setButton(activeOutputButton[kchar], 0);
             activeOutputButton[kchar] = 255;
+            buttonLongPressed[kchar] = false;
           } else {
             int outputButton = slot + (currentLayer - 1) * NUM_ACTIVE_BUTTONS;
             Joystick.setButton(outputButton, 1);
@@ -343,10 +349,11 @@ void CheckAllButtons(void) {
     int kchar = buttbx.key[i].kchar;
     if (kchar == LAYER2_BUTTON_INDEX || kchar == LAYER3_BUTTON_INDEX) continue;
 
-    if (buttbx.key[i].kstate == HOLD && activeOutputButton[kchar] == 255) {
+    if (buttbx.key[i].kstate == HOLD && !buttonLongPressed[kchar]) {
       if (millis() - buttonPressTimes[kchar] >= LONG_PRESS_DURATION) {
         int layer2Button = outputSlotForKchar[kchar] + (2 - 1) * NUM_ACTIVE_BUTTONS;
         activeOutputButton[kchar] = layer2Button;
+        buttonLongPressed[kchar] = true;
         Joystick.setButton(layer2Button, 1);
       }
     }
