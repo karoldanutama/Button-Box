@@ -48,4 +48,4 @@ leonardo.build.usb_product="Your Device Name Here"
 |-----|-----|-------------|--------|---------|---------------------|--------------|
 | `0x256b` | `0xc618` | Akamai Box 5x5 - 64 Buttons | 5x5 matrix | 64 | 8 | Simple button box with a 5x5 pin layout, firmware-expanded to 64 joystick buttons. |
 | `0x256c` | `0xc616` | Akamai Box 5x5 - 96 Buttons | 5x5 matrix | 96 | 7, 8 | Simple button box with a 5x5 pin layout, firmware-expanded to 96 joystick buttons. |
-| `0x256a` | `0xc617` | Akamai Box v2 5x5 - 64 Buttons | 5x5 matrix | 64 | 22 | DIY button box with 5 three-way toggle switches, 8 push buttons, 1 self-lock start button, 1 aviation toggle switch with safety cover (ignition), and 4 rotary encoders with pushable button. Physical inputs are firmware-expanded to 64 joystick buttons. |
+| `0x256a` | `0xc615` | Akamai Box 5x5 v2.1 - 96 Buttons | 5x5 matrix | 64 | 22,21 | DIY button box with 5 three-way toggle switches, 8 push buttons, 1 self-lock start button, 1 aviation toggle switch with safety cover (ignition), and 4 rotary encoders with pushable button. Physical inputs are firmware-expanded to 64 joystick buttons. |
