@@ -22,7 +22,6 @@
 
 #include <Keypad.h>
 #include <Joystick.h>
-#include <EEPROM.h>
 
 // Controller Configuration -- Change this before deploy
 #define CONTROLLER_ID 2 // Change this to 1 for the second controller, 2 for third, etc.
@@ -93,17 +92,7 @@
 #define ENCODER_BASE (NUM_ACTIVE_BUTTONS * 3)
 #define TOTAL_JOYSTICK_BUTTONS 96
 
-// EEPROM address for storing button press duration
-#define EEPROM_BUTTON_DURATION_ADDR 0
-
-// Button assignments
-#define TOGGLE_BUTTON_DURATION_BTN 100 /// Disable this function for now
-#define TOGGLE_HOLD_DURATION 3000 // Hold duration in ms for toggling button mode
-#define DEFAULT_PRESS_HOLD -1
 #define LONG_PRESS_DURATION 1500 // Hold duration in ms to promote button to layer 2
-
-// Initial button press duration (will be overridden by EEPROM value if it exists)
-int buttonPressDuration = DEFAULT_PRESS_HOLD; // -1 for original behavior, positive value for momentary press duration in ms
 
 #if defined(DIMENSION_3x11)
 byte buttons[NUMROWS][NUMCOLS] = {
@@ -246,7 +235,7 @@ Joystick_ Joystick(JOYSTICK_REPORT_ID,
   false, false, false, false, false, false,
   false, false, false, false, false);
 
-// Add timestamp array for button press tracking
+// Timestamp for each button's press, used for long-press-to-layer-2 detection
 unsigned long buttonPressTimes[NUMBUTTONS] = {0};
 
 // Tracks the actual joystick output button each physical key most recently
@@ -267,19 +256,9 @@ byte outputSlotForKchar[NUMBUTTONS];
 // read, not a priority contest.
 int currentLayer = 1;
 
-void blinkLED(int times) {
-  for (int i = 0; i < times; i++) {
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(200);
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(200);
-  }
-}
-
 void setup() {
   Joystick.begin();
   rotary_init();
-  pinMode(LED_BUILTIN, OUTPUT);
 
   for (int i = 0; i < NUMBUTTONS; i++) {
     activeOutputButton[i] = 255;
@@ -297,15 +276,6 @@ void setup() {
     }
   }
   // nextSlot should now equal NUM_ACTIVE_BUTTONS.
-
-  // NOTE: deliberately NOT reading buttonPressDuration from EEPROM here.
-  // The only feature that ever wrote a non-default value to this address
-  // (holding button 100 for 3s) is dead code in this matrix -- button 100
-  // doesn't exist on a 25-button layout, so it can never be re-triggered.
-  // EEPROM survives reflashing, so a stale value from an earlier sketch
-  // variant would otherwise silently turn every button momentary. Buttons
-  // stay pure hold-to-press: buttonPressDuration is fixed at -1.
-  buttonPressDuration = DEFAULT_PRESS_HOLD;
 }
 
 void loop() {
@@ -377,7 +347,7 @@ void CheckAllButtons(void) {
     }
   }
 
-  // Check for auto-release on all pressed buttons
+  // Check held buttons for long-press promotion to layer 2
   for (int i=0; i<LIST_MAX; i++) {
     int kchar = buttbx.key[i].kchar;
     if (kchar == LAYER2_BUTTON_INDEX || kchar == LAYER3_BUTTON_INDEX) continue;
@@ -393,25 +363,6 @@ void CheckAllButtons(void) {
             activeOutputButton[kchar] = layer2Button;
             Joystick.setButton(layer2Button, 1);
             buttonLongPressed[kchar] = true;
-          }
-        }
-        if (kchar == TOGGLE_BUTTON_DURATION_BTN) {
-          if (millis() - buttonPressTimes[kchar] >= TOGGLE_HOLD_DURATION) {
-            // Toggle between -1 and 50
-            buttonPressDuration = (buttonPressDuration == -1) ? DEFAULT_PRESS_HOLD : -1;
-            // Save to EEPROM
-            EEPROM.write(EEPROM_BUTTON_DURATION_ADDR, buttonPressDuration);
-            // Blink LED three times to indicate change
-            blinkLED(3);
-            // Reset the press time to prevent multiple toggles
-            buttonPressTimes[kchar] = millis();
-          }
-        } else if (buttonPressDuration > 0) {
-          if (millis() - buttonPressTimes[kchar] >= buttonPressDuration) {
-            if (activeOutputButton[kchar] != 255) {
-              Joystick.setButton(activeOutputButton[kchar], 0);
-              activeOutputButton[kchar] = 255;
-            }
           }
         }
         break;
