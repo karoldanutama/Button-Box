@@ -238,6 +238,9 @@ Joystick_ Joystick(JOYSTICK_REPORT_ID,
 // Timestamp for each button's press, used for long-press-to-layer-2 detection
 unsigned long buttonPressTimes[NUMBUTTONS] = {0};
 
+// Output button for sustained long-press, released on keyup. 255 = none active.
+byte activeOutputButton[NUMBUTTONS];
+
 // Maps each physical kchar (0..NUMBUTTONS-1) to a compact 0..NUM_ACTIVE_BUTTONS-1
 // output slot. 255 = this kchar is a layer-select modifier and never outputs.
 // Built once in setup() from LAYER2_BUTTON_INDEX / LAYER3_BUTTON_INDEX.
@@ -252,6 +255,10 @@ int currentLayer = 1;
 void setup() {
   Joystick.begin();
   rotary_init();
+
+  for (int i = 0; i < NUMBUTTONS; i++) {
+    activeOutputButton[i] = 255;
+  }
 
   // Build the compact output-slot mapping, skipping the two selector kchars.
   byte nextSlot = 0;
@@ -314,16 +321,33 @@ void CheckAllButtons(void) {
       switch (buttbx.key[i].kstate) {
         case PRESSED:
           buttonPressTimes[kchar] = millis();
+          activeOutputButton[kchar] = 255;
           break;
         case RELEASED: {
-          unsigned long holdDuration = millis() - buttonPressTimes[kchar];
-          int layer = (holdDuration >= LONG_PRESS_DURATION) ? 2 : currentLayer;
-          int outputButton = slot + (layer - 1) * NUM_ACTIVE_BUTTONS;
-          Joystick.setButton(outputButton, 1);
-          delay(50);
-          Joystick.setButton(outputButton, 0);
+          if (activeOutputButton[kchar] != 255) {
+            Joystick.setButton(activeOutputButton[kchar], 0);
+            activeOutputButton[kchar] = 255;
+          } else {
+            int outputButton = slot + (currentLayer - 1) * NUM_ACTIVE_BUTTONS;
+            Joystick.setButton(outputButton, 1);
+            delay(50);
+            Joystick.setButton(outputButton, 0);
+          }
           break;
         }
+      }
+    }
+  }
+
+  for (int i=0; i<LIST_MAX; i++) {
+    int kchar = buttbx.key[i].kchar;
+    if (kchar == LAYER2_BUTTON_INDEX || kchar == LAYER3_BUTTON_INDEX) continue;
+
+    if (buttbx.key[i].kstate == HOLD && activeOutputButton[kchar] == 255) {
+      if (millis() - buttonPressTimes[kchar] >= LONG_PRESS_DURATION) {
+        int layer2Button = outputSlotForKchar[kchar] + (2 - 1) * NUM_ACTIVE_BUTTONS;
+        activeOutputButton[kchar] = layer2Button;
+        Joystick.setButton(layer2Button, 1);
       }
     }
   }
