@@ -324,14 +324,17 @@ void CheckAllButtons(void) {
 
       switch (buttbx.key[i].kstate) {
         case PRESSED:
-          buttonPressTimes[kchar] = millis();
-          activeOutputButton[kchar] = 255;
+          if (!buttonLongPressed[kchar]) {
+            buttonPressTimes[kchar] = millis();
+            activeOutputButton[kchar] = 255;
+          }
           buttonLongPressed[kchar] = false;
           break;
         case RELEASED: {
-          if (buttonLongPressed[kchar]) {
-            Joystick.setButton(activeOutputButton[kchar], 0);
-            activeOutputButton[kchar] = 255;
+          unsigned long holdDuration = millis() - buttonPressTimes[kchar];
+          if (holdDuration >= LONG_PRESS_DURATION) {
+            int layer2Button = outputSlotForKchar[kchar] + (2 - 1) * NUM_ACTIVE_BUTTONS;
+            Joystick.setButton(layer2Button, 0);
             buttonLongPressed[kchar] = false;
           } else {
             int outputButton = slot + (currentLayer - 1) * NUM_ACTIVE_BUTTONS;
@@ -339,6 +342,7 @@ void CheckAllButtons(void) {
             delay(50);
             Joystick.setButton(outputButton, 0);
           }
+          activeOutputButton[kchar] = 255;
           break;
         }
       }
