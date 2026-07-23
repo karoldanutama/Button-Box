@@ -45,31 +45,37 @@
 #define MAX_ROTARIES 4 // Max number of rotaries
 
 #if defined(DIMENSION_3x11)
+  #define DIMENSION_STR "3x11"
   #define NUMROWS 3
   #define NUMCOLS 11
   #define NUMROTARIES 0
   #define NUMBUTTONS 32
 #elif defined(DIMENSION_6x5)
+  #define DIMENSION_STR "6x5"
   #define NUMROWS 6
   #define NUMCOLS 5
   #define NUMROTARIES 3
   #define NUMBUTTONS 26
 #elif defined(DIMENSION_6x4)
+  #define DIMENSION_STR "6x4"
   #define NUMROWS 6
   #define NUMCOLS 4
   #define NUMROTARIES 4
   #define NUMBUTTONS 24
 #elif defined(DIMENSION_7x3)
+  #define DIMENSION_STR "7x3"
   #define NUMROWS 7
   #define NUMCOLS 3
   #define NUMROTARIES 4
   #define NUMBUTTONS 21
 #elif defined(DIMENSION_5x5)
+  #define DIMENSION_STR "5x5"
   #define NUMROWS 5
   #define NUMCOLS 5
   #define NUMROTARIES 4
   #define NUMBUTTONS 25
 #else
+  #define DIMENSION_STR "5x5"
   #define NUMROWS 5
   #define NUMCOLS 5
   #define NUMROTARIES 4
@@ -85,6 +91,13 @@
 #define EEPROM_LAYER2_ADDR 1
 #define EEPROM_LAYER3_ADDR 2
 #define PROG_HOLD_DURATION 10000 // Hold duration in ms for programming gestures
+#define FIRMWARE_VERSION "2.3"
+#define VERSION_BUTTON 2 // Button 3 (index 2) held 10s prints version to Serial
+
+// When defined, only rotary encoders respond to layer changes.
+// Buttons always output on Layer 1 regardless of the current layer.
+// Uncomment this line to enable rotary-only layer mode.
+// #define ROTARY_ONLY_LAYERS
 
 // Number of active matrix buttons per layer (always 2 less than total,
 // since 2 positions are reserved for layer selectors). Used for the
@@ -270,10 +283,12 @@ enum ProgState {
 ProgState progState = PROG_IDLE;
 byte progTarget = 255;
 unsigned long progStartTime = 0;
+unsigned long versionStartTime = 0;
 
 void setup() {
   Joystick.begin();
   rotary_init();
+  Serial.begin(9600);
 
   for (int i = 0; i < NUMBUTTONS; i++) {
     activeOutputButton[i] = 255;
@@ -351,7 +366,11 @@ void CheckAllButtons(void) {
 
       switch (buttbx.key[i].kstate) {
         case PRESSED: {
+#ifdef ROTARY_ONLY_LAYERS
+          int outputButton = slot;
+#else
           int outputButton = slot + (currentLayer - 1) * NUM_ACTIVE_BUTTONS;
+#endif
           activeOutputButton[kchar] = outputButton;
           Joystick.setButton(outputButton, 1);
           break;
@@ -448,6 +467,15 @@ void CheckProgrammingGestures() {
         progState = PROG_WAIT_L2;
       } else if (!b1Down && b2Down) {
         progState = PROG_WAIT_L3;
+      } else if (!b1Down && !b2Down && isKeyDown(VERSION_BUTTON)) {
+        if (versionStartTime == 0) {
+          versionStartTime = millis();
+        } else if (millis() - versionStartTime >= PROG_HOLD_DURATION) {
+          printConfig();
+          versionStartTime = 0;
+        }
+      } else {
+        versionStartTime = 0;
       }
       break;
 
@@ -518,6 +546,39 @@ void CheckProgrammingGestures() {
       }
       break;
   }
+}
+
+// Prints the current firmware configuration to Serial.
+void printConfig() {
+  Serial.println(F("--- Button Box Config ---"));
+  Serial.print(F("Firmware: v"));
+  Serial.println(F(FIRMWARE_VERSION));
+  Serial.print(F("Dimension: "));
+  Serial.println(F(DIMENSION_STR));
+  Serial.print(F("Buttons: "));
+  Serial.println(NUMBUTTONS);
+  Serial.print(F("Rotaries: "));
+  Serial.println(NUMROTARIES);
+  Serial.print(F("Controller ID: "));
+  Serial.println(CONTROLLER_ID);
+  Serial.print(F("Joystick report ID: "));
+  Serial.println(JOYSTICK_REPORT_ID);
+
+  Serial.print(F("Layer 2 selector: "));
+  if (layer2Index == 255) Serial.println(F("unassigned"));
+  else Serial.println(layer2Index);
+
+  Serial.print(F("Layer 3 selector: "));
+  if (layer3Index == 255) Serial.println(F("unassigned"));
+  else Serial.println(layer3Index);
+
+#ifdef ROTARY_ONLY_LAYERS
+  Serial.println(F("Rotary-only layers: true"));
+#else
+  Serial.println(F("Rotary-only layers: false"));
+#endif
+
+  Serial.println(F("--------------------------"));
 }
 
 // Helper: returns true if the given kchar is currently pressed or held.

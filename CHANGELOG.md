@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.3 — Rotary-Only Layer Mode
+
+### Added
+- `#define ROTARY_ONLY_LAYERS` compile-time toggle: when uncommented, buttons always output on Layer 1 regardless of the current layer. Rotary encoders still respond to layer changes normally.
+- Long-press **Button 3** (index 2) for 10s to print firmware version to Serial console (`Firmware: v2.3` at 9600 baud).
+
 ## v2.2 — Dynamic Layer Selector Assignment
 
 ### Added
