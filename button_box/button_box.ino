@@ -26,12 +26,12 @@
 
 // Controller Configuration -- Change this before deploy
 #define CONTROLLER_ID 2 // Change this to 1 for the second controller, 2 for third, etc.
-#define DIMENSION_5x5
+#define DIMENSION_6x4
 
 // USB identity -- must match the values in boards.txt (see DEVICES-MANAGEMENT.md)
-#define BOX_VID "0x2341"
-#define BOX_PID "0x8036"
-#define BOX_PRODUCT "Arduino Leonardo"
+#define BOX_VID "0x255a"
+#define BOX_PID "0xc613"
+#define BOX_PRODUCT "Akamai Steering Wheel 6x4 v2.3.1 - 96 Buttons"
 
 // Use completely different report IDs to avoid conflicts
 #if CONTROLLER_ID == 1
@@ -96,13 +96,13 @@
 #define EEPROM_LAYER2_ADDR 1
 #define EEPROM_LAYER3_ADDR 2
 #define PROG_HOLD_DURATION 10000 // Hold duration in ms for programming gestures
-#define FIRMWARE_VERSION "2.3"
-#define VERSION_BUTTON 2 // Button 3 (index 2) held 10s prints version to Serial
+#define FIRMWARE_VERSION "2.3.1"
+#define VERSION_BUTTON 21 // Button 22 (index 21) held 10s prints version to Serial
 
 // When defined, only rotary encoders respond to layer changes.
 // Buttons always output on Layer 1 regardless of the current layer.
 // Uncomment this line to enable rotary-only layer mode.
-// #define ROTARY_ONLY_LAYERS
+#define ROTARY_ONLY_LAYERS
 
 // Number of active matrix buttons per layer (always 2 less than total,
 // since 2 positions are reserved for layer selectors). Used for the
