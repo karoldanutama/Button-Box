@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.4 — Serial Feedback for Layer Programming
+
+### Added
+- Serial output on successful layer programming: "Layer 2 selector assigned to button X", "Layer 3 selector assigned to button Y", and "Layer selectors reset (unassigned)" messages printed to Serial console.
+
+### Changed
+- Programming gesture hold time reduced from 10s to 5s (`PROG_HOLD_DURATION` 10000 → 5000).
+
 ## v2.3.1 — Print Config on Button 22
 
 ### Changed
