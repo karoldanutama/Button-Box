@@ -31,7 +31,7 @@
 // USB identity -- must match the values in boards.txt (see DEVICES-MANAGEMENT.md)
 #define BOX_VID "0x255a"
 #define BOX_PID "0xc613"
-#define BOX_PRODUCT "Akamai Steering Wheel 6x4 v2.4 - 96 Buttons"
+#define BOX_PRODUCT "Akamai Steering Wheel 6x4 v2.5.1 - 96 Buttons"
 
 // Use completely different report IDs to avoid conflicts
 #if CONTROLLER_ID == 1
@@ -96,7 +96,7 @@
 #define EEPROM_LAYER2_ADDR 1
 #define EEPROM_LAYER3_ADDR 2
 #define PROG_HOLD_DURATION 5000 // Hold duration in ms for programming gestures
-#define FIRMWARE_VERSION "2.4"
+#define FIRMWARE_VERSION "2.5.1"
 #define VERSION_BUTTON 21 // Button 22 (index 21) held 5s prints version to Serial
 
 // When defined, only rotary encoders respond to layer changes.
@@ -104,16 +104,20 @@
 // Uncomment this line to enable rotary-only layer mode.
 #define ROTARY_ONLY_LAYERS
 
-// Number of active matrix buttons per layer (always 2 less than total,
-// since 2 positions are reserved for layer selectors). Used for the
-// button output formula and encoder output numbering.
-#define NUM_ACTIVE_BUTTONS (NUMBUTTONS - 2)
-
-// Output numbering:
-//   Matrix buttons: 0..(NUM_ACTIVE_BUTTONS*3 - 1)   => 0-68  (23 per layer)
-//   Encoders:       ENCODER_BASE..ENCODER_BASE+23   => 69-92 (8 per layer)
-// Total used: 93. Declared to the Joystick library as 96 for headroom.
-#define ENCODER_BASE (NUM_ACTIVE_BUTTONS * 3)
+// Output numbering (static — button index = output index, gaps for layer selectors):
+//   Normal layered mode:
+//     Matrix buttons: 0..(NUMBUTTONS*3 - 1) => 0-71
+//     Encoders:       72..95
+//   Rotary-only mode:
+//     Matrix buttons: 0..23
+//     Encoders:       24..47
+// Keeping rotary-only encoders in the low range avoids games that ignore
+// higher-numbered buttons from clipping Layer 2/3 rotary inputs.
+#ifdef ROTARY_ONLY_LAYERS
+#define ENCODER_BASE NUMBUTTONS
+#else
+#define ENCODER_BASE (NUMBUTTONS * 3)
+#endif
 #define TOTAL_JOYSTICK_BUTTONS 96
 
 #if defined(DIMENSION_3x11)
@@ -262,11 +266,6 @@ Joystick_ Joystick(JOYSTICK_REPORT_ID,
 // changes mid-press. 255 = none active.
 byte activeOutputButton[NUMBUTTONS];
 
-// Maps each physical kchar (0..NUMBUTTONS-1) to a compact 0..NUM_ACTIVE_BUTTONS-1
-// output slot. 255 = this kchar is a layer-select modifier and never outputs.
-// Built once in setup() from the EEPROM-loaded selector indices.
-byte outputSlotForKchar[NUMBUTTONS];
-
 // Current active layer: 1, 2, or 3. Recomputed once per loop() from the
 // live state of the assigned selector buttons (if any).
 int currentLayer = 1;
@@ -305,16 +304,6 @@ void setup() {
   layer3Index = EEPROM.read(EEPROM_LAYER3_ADDR);
   if (layer2Index >= NUMBUTTONS) layer2Index = 255;
   if (layer3Index >= NUMBUTTONS) layer3Index = 255;
-
-  // Build the output-slot mapping from the EEPROM-loaded selector indices.
-  byte nextSlot = 0;
-  for (int kc = 0; kc < NUMBUTTONS; kc++) {
-    if (kc == layer2Index || kc == layer3Index) {
-      outputSlotForKchar[kc] = 255;
-    } else {
-      outputSlotForKchar[kc] = nextSlot++;
-    }
-  }
 }
 
 void loop() {
@@ -367,14 +356,12 @@ void CheckAllButtons(void) {
         continue;
       }
 
-      byte slot = outputSlotForKchar[kchar];
-
       switch (buttbx.key[i].kstate) {
         case PRESSED: {
 #ifdef ROTARY_ONLY_LAYERS
-          int outputButton = slot;
+          int outputButton = kchar;
 #else
-          int outputButton = slot + (currentLayer - 1) * NUM_ACTIVE_BUTTONS;
+          int outputButton = kchar + (currentLayer - 1) * NUMBUTTONS;
 #endif
           activeOutputButton[kchar] = outputButton;
           Joystick.setButton(outputButton, 1);

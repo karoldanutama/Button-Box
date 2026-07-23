@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.5.1 — Restore Rotary Inputs in Rotary-Only Mode
+
+### Fixed
+- Restored Layer 2/3 rotary encoder inputs when `ROTARY_ONLY_LAYERS` is enabled. Encoder outputs now start immediately after the 24 base buttons (`24..47`) instead of being pushed into the high `72..95` range, which some games were not reading.
+
+## v2.5 — Static Button Mapping
+
+### Changed
+- Button output mapping is now **static**: each physical button always outputs at its own index, regardless of which buttons are assigned as layer selectors. Previously, assigning a selector would compact the output slots, shifting all higher-indexed buttons down by one and requiring re-binding in games. Now, selector buttons simply produce no output — other buttons keep their original joystick button numbers.
+- `NUM_ACTIVE_BUTTONS` removed; `ENCODER_BASE` now uses `NUMBUTTONS`
+
+### Removed
+- `outputSlotForKchar[]` array and its compaction loop in `setup()`
+
 ## v2.4 — Serial Feedback for Layer Programming
 
 ### Added
