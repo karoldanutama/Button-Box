@@ -28,6 +28,11 @@
 #define CONTROLLER_ID 2 // Change this to 1 for the second controller, 2 for third, etc.
 #define DIMENSION_5x5
 
+// USB identity -- must match the values in boards.txt (see DEVICES-MANAGEMENT.md)
+#define BOX_VID "0x2341"
+#define BOX_PID "0x8036"
+#define BOX_PRODUCT "Arduino Leonardo"
+
 // Use completely different report IDs to avoid conflicts
 #if CONTROLLER_ID == 1
   #define JOYSTICK_REPORT_ID 500
@@ -563,6 +568,13 @@ void printConfig() {
   Serial.println(CONTROLLER_ID);
   Serial.print(F("Joystick report ID: "));
   Serial.println(JOYSTICK_REPORT_ID);
+
+  Serial.print(F("USB VID: "));
+  Serial.println(F(BOX_VID));
+  Serial.print(F("USB PID: "));
+  Serial.println(F(BOX_PID));
+  Serial.print(F("USB Product: "));
+  Serial.println(F(BOX_PRODUCT));
 
   Serial.print(F("Layer 2 selector: "));
   if (layer2Index == 255) Serial.println(F("unassigned"));
