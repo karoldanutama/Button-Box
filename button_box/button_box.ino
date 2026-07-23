@@ -4,18 +4,18 @@
 //AMSTUDIO
 //20.8.17
 //
-// --- MODIFIED: 3-layer system driven by a single 3-way toggle switch ---
-// The toggle's two throw contacts are wired into the button matrix at
-// LAYER2_BUTTON_INDEX and LAYER3_BUTTON_INDEX. Because it's a mechanical
-// SPDT toggle (not two separate buttons), only one throw can ever be active
-// at a time -- the third (center) position leaves both open, which is
-// Layer 1 by default. No priority/tie-break logic is needed; the hardware
-// itself guarantees mutual exclusivity.
+// --- MODIFIED: Dynamic layer selector assignment ---
+// Layer selectors are no longer hardcoded. Users assign which physical
+// buttons act as layer toggles via long-press programming gestures:
+//   B1 + BX held 10s  -> BX becomes Layer 2 selector
+//   B2 + BY held 10s  -> BY becomes Layer 3 selector
+//   B1 + B2 held 10s  -> reset both selectors (no layers, 25 active buttons)
+// Selector assignments persist in EEPROM across power cycles.
+// Default: unassigned (255) -- all 25 buttons are active, Layer 1 only.
 //
-// These two positions are silent modifiers: flipping the switch selects a
-// layer but never fires a joystick button press itself (a toggle switch
-// staying "on" for a whole layer shouldn't also hold a button down the
-// entire time).
+// Selector buttons never fire their own joystick output. They are silent
+// modifiers: activating a layer via a held button shouldn't also hold a
+// joystick button down the entire time.
 //
 // Fixed a pre-existing bug in the 5x5 button map: the last row repeated
 // "20" instead of using "24", meaning physical button 24 never worked.
@@ -77,13 +77,18 @@
 #endif
 
 // --- LAYER CONFIG ---
-// Matrix positions wired to the two throw contacts of the 3-way toggle.
-// Neither position ever fires its own joystick button -- see note above.
-#define LAYER2_BUTTON_INDEX 8
-#define LAYER3_BUTTON_INDEX 7
+// Layer selectors are runtime-configurable via long-press programming
+// gestures (see CheckProgrammingGestures). Indices are persisted in EEPROM.
+// Default: 255 (unassigned) -- all 25 buttons are active, Layer 1 only.
+//
+// EEPROM addresses for persistent selector configuration.
+#define EEPROM_LAYER2_ADDR 1
+#define EEPROM_LAYER3_ADDR 2
+#define PROG_HOLD_DURATION 10000 // Hold duration in ms for programming gestures
 
-// Number of matrix buttons that actually produce output: all 25 physical
-// positions minus the 2 dedicated to the layer-select toggle.
+// Number of active matrix buttons per layer (always 2 less than total,
+// since 2 positions are reserved for layer selectors). Used for the
+// button output formula and encoder output numbering.
 #define NUM_ACTIVE_BUTTONS (NUMBUTTONS - 2)
 
 // Output numbering:
@@ -92,17 +97,6 @@
 // Total used: 93. Declared to the Joystick library as 96 for headroom.
 #define ENCODER_BASE (NUM_ACTIVE_BUTTONS * 3)
 #define TOTAL_JOYSTICK_BUTTONS 96
-
-// EEPROM address for storing button press duration
-#define EEPROM_BUTTON_DURATION_ADDR 0
-
-// Button assignments
-#define TOGGLE_BUTTON_DURATION_BTN 100 /// Disable this function for now
-#define TOGGLE_HOLD_DURATION 3000 // Hold duration in ms for toggling button mode
-#define DEFAULT_PRESS_HOLD -1
-
-// Initial button press duration (will be overridden by EEPROM value if it exists)
-int buttonPressDuration = DEFAULT_PRESS_HOLD; // -1 for original behavior, positive value for momentary press duration in ms
 
 #if defined(DIMENSION_3x11)
 byte buttons[NUMROWS][NUMCOLS] = {
@@ -245,9 +239,6 @@ Joystick_ Joystick(JOYSTICK_REPORT_ID,
   false, false, false, false, false, false,
   false, false, false, false, false);
 
-// Add timestamp array for button press tracking
-unsigned long buttonPressTimes[NUMBUTTONS] = {0};
-
 // Tracks the actual joystick output button each physical key most recently
 // pressed, so a release always clears the correct one -- even if the layer
 // changes mid-press. 255 = none active.
@@ -255,76 +246,83 @@ byte activeOutputButton[NUMBUTTONS];
 
 // Maps each physical kchar (0..NUMBUTTONS-1) to a compact 0..NUM_ACTIVE_BUTTONS-1
 // output slot. 255 = this kchar is a layer-select modifier and never outputs.
-// Built once in setup() from LAYER2_BUTTON_INDEX / LAYER3_BUTTON_INDEX.
+// Built once in setup() from the EEPROM-loaded selector indices.
 byte outputSlotForKchar[NUMBUTTONS];
 
 // Current active layer: 1, 2, or 3. Recomputed once per loop() from the
-// live state of the toggle switch's two throw positions. Since it's a
-// mechanical SPDT toggle, only one can ever be active -- this is a plain
-// read, not a priority contest.
+// live state of the assigned selector buttons (if any).
 int currentLayer = 1;
 
-void blinkLED(int times) {
-  for (int i = 0; i < times; i++) {
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(200);
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(200);
-  }
-}
+// Runtime-configurable layer selector indices. 255 = unassigned.
+// Loaded from EEPROM on boot, modified by long-press programming gestures.
+byte layer2Index = 255;
+byte layer3Index = 255;
+
+// Programming-mode state machine for dynamic selector assignment.
+enum ProgState {
+  PROG_IDLE,
+  PROG_WAIT_L2,   // Button 1 held, waiting for target
+  PROG_WAIT_L3,   // Button 2 held, waiting for target
+  PROG_ARMED_L2,  // Button 1 + target held, counting 10s
+  PROG_ARMED_L3,  // Button 2 + target held, counting 10s
+  PROG_ARMED_RESET // Button 1 + Button 2 held, counting 10s
+};
+ProgState progState = PROG_IDLE;
+byte progTarget = 255;
+unsigned long progStartTime = 0;
 
 void setup() {
   Joystick.begin();
   rotary_init();
-  pinMode(LED_BUILTIN, OUTPUT);
 
   for (int i = 0; i < NUMBUTTONS; i++) {
     activeOutputButton[i] = 255;
   }
 
-  // Build the compact output-slot mapping, skipping the two selector kchars.
+  // Load selector indices from EEPROM. Unprogrammed EEPROM (0xFF = 255)
+  // naturally defaults to "unassigned". Clamp invalid values.
+  layer2Index = EEPROM.read(EEPROM_LAYER2_ADDR);
+  layer3Index = EEPROM.read(EEPROM_LAYER3_ADDR);
+  if (layer2Index >= NUMBUTTONS) layer2Index = 255;
+  if (layer3Index >= NUMBUTTONS) layer3Index = 255;
+
+  // Build the output-slot mapping from the EEPROM-loaded selector indices.
   byte nextSlot = 0;
   for (int kc = 0; kc < NUMBUTTONS; kc++) {
-    if (kc == LAYER2_BUTTON_INDEX || kc == LAYER3_BUTTON_INDEX) {
+    if (kc == layer2Index || kc == layer3Index) {
       outputSlotForKchar[kc] = 255;
     } else {
-      outputSlotForKchar[kc] = nextSlot;
-      nextSlot++;
+      outputSlotForKchar[kc] = nextSlot++;
     }
   }
-  // nextSlot should now equal NUM_ACTIVE_BUTTONS.
-
-  // NOTE: deliberately NOT reading buttonPressDuration from EEPROM here.
-  // The only feature that ever wrote a non-default value to this address
-  // (holding button 100 for 3s) is dead code in this matrix -- button 100
-  // doesn't exist on a 25-button layout, so it can never be re-triggered.
-  // EEPROM survives reflashing, so a stale value from an earlier sketch
-  // variant would otherwise silently turn every button momentary. Buttons
-  // stay pure hold-to-press: buttonPressDuration is fixed at -1.
-  buttonPressDuration = DEFAULT_PRESS_HOLD;
 }
 
 void loop() {
-  buttbx.getKeys(); // scan matrix once per loop; both functions below read the result
+  buttbx.getKeys(); // scan matrix once per loop; all functions below read the result
   UpdateLayer();
   CheckAllEncoders();
+  CheckProgrammingGestures();
   CheckAllButtons();
 }
 
-// Reads the toggle switch's two throw positions and sets currentLayer.
-// Mechanically exclusive -- both can never read HOLD/PRESSED at once --
-// but the else-chain below is written defensively regardless.
+// Reads the selector button states and sets currentLayer.
+// If no selectors are assigned, remains on Layer 1.
 void UpdateLayer() {
+  if (layer2Index == 255 && layer3Index == 255) {
+    currentLayer = 1;
+    return;
+  }
+
   bool layer2Thrown = false;
   bool layer3Thrown = false;
 
   for (int i=0; i<LIST_MAX; i++) {
     int kchar = buttbx.key[i].kchar;
     KeyState ks = buttbx.key[i].kstate;
-    if (kchar == LAYER2_BUTTON_INDEX && (ks == PRESSED || ks == HOLD)) {
+    if (kchar == layer2Index && (ks == PRESSED || ks == HOLD)) {
       layer2Thrown = true;
     }
-    if (kchar == LAYER3_BUTTON_INDEX && (ks == PRESSED || ks == HOLD)) {
+    if (kchar == layer3Index && (ks == PRESSED || ks == HOLD)) {
       layer3Thrown = true;
     }
   }
@@ -344,7 +342,8 @@ void CheckAllButtons(void) {
       int kchar = buttbx.key[i].kchar;
 
       // Layer-select positions never fire a joystick button themselves.
-      if (kchar == LAYER2_BUTTON_INDEX || kchar == LAYER3_BUTTON_INDEX) {
+      // Also suppress buttons involved in an active programming gesture.
+      if (kchar == layer2Index || kchar == layer3Index || isProgrammingActive(kchar)) {
         continue;
       }
 
@@ -352,8 +351,6 @@ void CheckAllButtons(void) {
 
       switch (buttbx.key[i].kstate) {
         case PRESSED: {
-          // Record the time when button is pressed
-          buttonPressTimes[kchar] = millis();
           int outputButton = slot + (currentLayer - 1) * NUM_ACTIVE_BUTTONS;
           activeOutputButton[kchar] = outputButton;
           Joystick.setButton(outputButton, 1);
@@ -368,36 +365,6 @@ void CheckAllButtons(void) {
           break;
         }
       }
-    }
-  }
-
-  // Check for auto-release on all pressed buttons
-  for (int i=0; i<LIST_MAX; i++) {
-    int kchar = buttbx.key[i].kchar;
-    if (kchar == LAYER2_BUTTON_INDEX || kchar == LAYER3_BUTTON_INDEX) continue;
-
-    switch (buttbx.key[i].kstate) {
-      case HOLD:
-        if (kchar == TOGGLE_BUTTON_DURATION_BTN) {
-          if (millis() - buttonPressTimes[kchar] >= TOGGLE_HOLD_DURATION) {
-            // Toggle between -1 and 50
-            buttonPressDuration = (buttonPressDuration == -1) ? DEFAULT_PRESS_HOLD : -1;
-            // Save to EEPROM
-            EEPROM.write(EEPROM_BUTTON_DURATION_ADDR, buttonPressDuration);
-            // Blink LED three times to indicate change
-            blinkLED(3);
-            // Reset the press time to prevent multiple toggles
-            buttonPressTimes[kchar] = millis();
-          }
-        } else if (buttonPressDuration > 0) {
-          if (millis() - buttonPressTimes[kchar] >= buttonPressDuration) {
-            if (activeOutputButton[kchar] != 255) {
-              Joystick.setButton(activeOutputButton[kchar], 0);
-              activeOutputButton[kchar] = 255;
-            }
-          }
-        }
-        break;
     }
   }
 }
@@ -436,4 +403,130 @@ void CheckAllEncoders(void) {
       Joystick.setButton(cw, 1); delay(50); Joystick.setButton(cw, 0);
     };
   }
+}
+
+// --- Dynamic Layer Selector Assignment ---
+
+// Returns true if kchar is currently involved in a programming gesture
+// and should be suppressed (no joystick output).
+bool isProgrammingActive(byte kchar) {
+  if (progState == PROG_IDLE) return false;
+  if ((progState == PROG_ARMED_L2 || progState == PROG_ARMED_L3) && kchar == progTarget) return true;
+  return false;
+}
+
+// Persists the current selector indices to EEPROM.
+void saveSelectorConfig() {
+  EEPROM.write(EEPROM_LAYER2_ADDR, layer2Index);
+  EEPROM.write(EEPROM_LAYER3_ADDR, layer3Index);
+}
+
+// State machine that detects long-press programming gestures:
+//   B1 + BX held 10s  -> assign BX as Layer 2 selector
+//   B2 + BY held 10s  -> assign BY as Layer 3 selector
+//   B1 + B2 held 10s  -> reset both selectors to unassigned
+// Early release of any involved button cancels the gesture.
+void CheckProgrammingGestures() {
+  bool b1Down = false, b2Down = false;
+  byte otherDown = 255;
+
+  for (int i = 0; i < LIST_MAX; i++) {
+    KeyState ks = buttbx.key[i].kstate;
+    if (ks != PRESSED && ks != HOLD) continue;
+    int kc = buttbx.key[i].kchar;
+    if (kc == 0) b1Down = true;
+    else if (kc == 1) b2Down = true;
+    else if (otherDown == 255) otherDown = kc;
+  }
+
+  switch (progState) {
+    case PROG_IDLE:
+      if (b1Down && b2Down) {
+        progState = PROG_ARMED_RESET;
+        progStartTime = millis();
+      } else if (b1Down && !b2Down) {
+        progState = PROG_WAIT_L2;
+      } else if (!b1Down && b2Down) {
+        progState = PROG_WAIT_L3;
+      }
+      break;
+
+    case PROG_WAIT_L2:
+      if (!b1Down) {
+        progState = PROG_IDLE;
+      } else if (b2Down) {
+        progState = PROG_ARMED_RESET;
+        progStartTime = millis();
+      } else if (otherDown != 255) {
+        progState = PROG_ARMED_L2;
+        progTarget = otherDown;
+        progStartTime = millis();
+        if (activeOutputButton[progTarget] != 255) {
+          Joystick.setButton(activeOutputButton[progTarget], 0);
+          activeOutputButton[progTarget] = 255;
+        }
+      }
+      break;
+
+    case PROG_WAIT_L3:
+      if (!b2Down) {
+        progState = PROG_IDLE;
+      } else if (b1Down) {
+        progState = PROG_ARMED_RESET;
+        progStartTime = millis();
+      } else if (otherDown != 255) {
+        progState = PROG_ARMED_L3;
+        progTarget = otherDown;
+        progStartTime = millis();
+        if (activeOutputButton[progTarget] != 255) {
+          Joystick.setButton(activeOutputButton[progTarget], 0);
+          activeOutputButton[progTarget] = 255;
+        }
+      }
+      break;
+
+    case PROG_ARMED_L2:
+      if (!b1Down || !isKeyDown(progTarget)) {
+        progState = PROG_IDLE;
+      } else if (millis() - progStartTime >= PROG_HOLD_DURATION) {
+        layer2Index = progTarget;
+        saveSelectorConfig();
+        progState = PROG_IDLE;
+        progTarget = 255;
+      }
+      break;
+
+    case PROG_ARMED_L3:
+      if (!b2Down || !isKeyDown(progTarget)) {
+        progState = PROG_IDLE;
+      } else if (millis() - progStartTime >= PROG_HOLD_DURATION) {
+        layer3Index = progTarget;
+        saveSelectorConfig();
+        progState = PROG_IDLE;
+        progTarget = 255;
+      }
+      break;
+
+    case PROG_ARMED_RESET:
+      if (!b1Down || !b2Down) {
+        progState = PROG_IDLE;
+      } else if (millis() - progStartTime >= PROG_HOLD_DURATION) {
+        layer2Index = 255;
+        layer3Index = 255;
+        saveSelectorConfig();
+        progState = PROG_IDLE;
+      }
+      break;
+  }
+}
+
+// Helper: returns true if the given kchar is currently pressed or held.
+bool isKeyDown(byte kchar) {
+  for (int i = 0; i < LIST_MAX; i++) {
+    if (buttbx.key[i].kchar == kchar) {
+      KeyState ks = buttbx.key[i].kstate;
+      if (ks == PRESSED || ks == HOLD) return true;
+    }
+  }
+  return false;
 }
