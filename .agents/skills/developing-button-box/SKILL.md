@@ -42,6 +42,8 @@ Development happens on **Linux**, but the firmware is deployed by **copy-pasting
 - The user should not need to edit any constants before uploading
 - If the PR changes behavior that requires different config per device, handle it with compile-time toggles (e.g., `#define ROTARY_ONLY_LAYERS`) so the user can set it once and forget it
 
+**Always remind the user** to update `boards.txt` on the Windows machine before deploying. The `BOX_VID`, `BOX_PID`, and `BOX_PRODUCT` values in the sketch must match the `leonardo.build.vid`, `leonardo.build.pid`, and `leonardo.build.usb_product` values in `boards.txt`. If they don't match, Windows and games will see the wrong device identity. See `DEVICES-MANAGEMENT.md` for the full procedure.
+
 ---
 
 ## 1. Conventional Commits
