@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.3 — Rotary-Only Layer Mode
+
+### Added
+- `#define ROTARY_ONLY_LAYERS` compile-time toggle: when uncommented, buttons always output on Layer 1 regardless of the current layer. Rotary encoders still respond to layer changes normally.
+- Long-press **Button 3** (index 2) for 10s to print full firmware configuration to Serial console (9600 baud). Output includes firmware version, dimension, button/rotary counts, controller ID, USB VID/PID/product name, layer selector assignments, and `ROTARY_ONLY_LAYERS` status.
+- `BOX_VID`, `BOX_PID`, `BOX_PRODUCT` compile-time defines for USB identity (must match `boards.txt` values, see `DEVICES-MANAGEMENT.md`).
+- `DIMENSION_STR` compile-time define for each matrix preset.
+- `Serial.begin(9600)` in `setup()`.
+- `printConfig()` helper function.
+
 ## v2.2 — Dynamic Layer Selector Assignment
 
 ### Added

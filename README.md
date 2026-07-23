@@ -8,9 +8,11 @@ This repository started as a fork of AMSTUDIO's 32-function button box project, 
 
 - Arduino Pro Micro / ATmega32U4 HID joystick firmware
 - Default `5x5` matrix configuration with multiple matrix presets in the codebase
-- `3-layer` input model selected by a single 3-way toggle switch
+- `3-layer` input model with **dynamic layer selector assignment** via long-press programming gestures
 - Silent layer-selector inputs that do not consume joystick button outputs
 - `4` rotary encoders with per-layer clockwise and counter-clockwise actions
+- `#define ROTARY_ONLY_LAYERS` compile-time toggle to restrict layering to encoders only
+- Long-press **Button 3** for 10s to print full firmware configuration to Serial console
 - Up to `96` declared joystick buttons, with `93` actively used in the default build
 - Compact logical-to-joystick button remapping that skips reserved selector positions
 - Safe button release handling across mid-press layer changes
@@ -40,12 +42,13 @@ The default configuration in `button_box/button_box.ino` is:
 - USB mode: HID joystick via `ArduinoJoystickLibrary`
 - Matrix preset: `DIMENSION_5x5`
 - Physical matrix positions: `25`
-- Reserved matrix positions: `2` for layer selection
+- Reserved matrix positions: `2` for layer selection (dynamically assignable)
 - Active matrix inputs: `23`
 - Rotary encoders: `4`
 - Layers: `3`
 - Declared joystick buttons: `96`
 - Actively used joystick buttons: `93`
+- Firmware version: queryable via Button 3 long-press (Serial, 9600 baud)
 
 ## Source Of Truth
 
@@ -71,6 +74,7 @@ void loop() {
   buttbx.getKeys();
   UpdateLayer();
   CheckAllEncoders();
+  CheckProgrammingGestures();
   CheckAllButtons();
 }
 ```
@@ -78,8 +82,9 @@ void loop() {
 That sequence matters:
 
 - `getKeys()` refreshes the matrix scan once per loop
-- `UpdateLayer()` derives the current layer from the live selector switch state
+- `UpdateLayer()` derives the current layer from the live selector button states
 - `CheckAllEncoders()` emits encoder pulses using the current layer
+- `CheckProgrammingGestures()` runs the long-press state machine for layer selector assignment, reset, and version output
 - `CheckAllButtons()` translates matrix events into joystick button state changes
 
 ## Compile-Time Configuration Strategy
@@ -157,36 +162,31 @@ This repo also fixes a bug present in an earlier 5x5 mapping where the last row 
 
 ## Layering Strategy
 
-The main feature added in this fork is a 3-layer system driven by one 3-way toggle switch.
+The firmware supports a 3-layer system with **dynamic layer selector assignment**.
 
-### Why A 3-Way Toggle
+### Dynamic Selector Assignment
 
-Instead of consuming multiple dedicated buttons for mode switching, the firmware treats a mechanical SPDT 3-way toggle as a layer selector:
+Layer selectors are no longer hardcoded to specific matrix positions. Users assign which physical buttons act as layer toggles via long-press programming gestures:
 
-- center position -> Layer 1
-- one throw -> Layer 2
-- other throw -> Layer 3
+| Gesture | Duration | Result |
+|---------|----------|--------|
+| Button 1 + Button X | 10s | Assign Button X as Layer 2 selector |
+| Button 2 + Button Y | 10s | Assign Button Y as Layer 3 selector |
+| Button 1 + Button 2 | 10s | Reset both selectors to unassigned |
 
-The sketch reserves two matrix positions for the two throw contacts:
+Selector assignments persist in EEPROM (addresses 1 and 2) across power cycles. Default is unassigned (255) — all 25 buttons are active, Layer 1 only.
 
-```cpp
-#define LAYER2_BUTTON_INDEX 8
-#define LAYER3_BUTTON_INDEX 7
-```
+### Rotary-Only Layer Mode
 
-Those two logical inputs are not exposed as joystick buttons. They are silent modifiers only.
+When `#define ROTARY_ONLY_LAYERS` is uncommented, buttons always output on Layer 1 regardless of the current layer. Only rotary encoders respond to layer changes. This is useful for devices where physical buttons should remain consistent across modes (e.g., a steering wheel where buttons are fixed but encoders are mode-dependent).
 
-### Why The Selector Is Silent
+### Why Selectors Are Silent
 
-If the layer-select switch also emitted joystick button presses, the box would appear to hold a game button down for as long as the switch stayed in that layer. That is usually the wrong semantic for a mode selector. The sketch therefore ignores those key codes during normal button output handling.
+Selector buttons never fire their own joystick output. They are silent modifiers: activating a layer via a held button shouldn't also hold a joystick button down the entire time.
 
 ### Runtime Layer Resolution
 
-`UpdateLayer()` walks the Keypad state list and checks whether either selector input is currently `PRESSED` or `HOLD`.
-
-If neither selector input is active, the firmware falls back to Layer 1.
-
-This is deliberately simple because the hardware itself enforces mutual exclusivity: a mechanical SPDT toggle can only energize one throw at a time.
+`UpdateLayer()` walks the Keypad state list and checks whether either assigned selector input is currently `PRESSED` or `HOLD`. If no selectors are assigned (both 255), the firmware stays on Layer 1. If both selectors are somehow active, Layer 3 wins (defensive priority chain).
 
 ## Output Numbering Strategy
 
@@ -204,9 +204,9 @@ So only `23` matrix positions generate normal joystick outputs.
 
 ### Step 2: Compact The Remaining Physical Buttons
 
-During `setup()`, the sketch builds `outputSlotForKchar[]`.
+During `setup()`, the sketch builds `outputSlotForKchar[]` from the EEPROM-loaded selector indices.
 
-This converts each physical/logical matrix key code into a compact output slot from `0..22`, skipping the two reserved selector indices entirely.
+This converts each physical/logical matrix key code into a compact output slot from `0..22`, skipping the two selector indices (whatever they are assigned to).
 
 That means joystick numbering does not have holes just because two physical positions are dedicated to layer selection.
 
@@ -267,53 +267,18 @@ This is one of the more important implementation details in the fork because it 
 
 ## Button Event Handling Strategy
 
-`CheckAllButtons()` handles matrix-derived button outputs in two passes.
+`CheckAllButtons()` handles matrix-derived button outputs in a single pass.
 
-### First Pass: Edge-Driven State Changes
-
-The first pass looks at `stateChanged` entries from the Keypad list.
+The pass looks at `stateChanged` entries from the Keypad list.
 
 Behavior:
 
 - selector keys are skipped completely
-- on `PRESSED`, the sketch timestamps the key and asserts its joystick output
+- buttons involved in an active programming gesture are suppressed
+- on `PRESSED`, the sketch asserts the joystick output for the current layer (or Layer 1 if `ROTARY_ONLY_LAYERS` is enabled)
 - on `RELEASED` or `IDLE`, the sketch releases the previously stored output if one is active
 
-This is effectively the normal hold-to-press behavior.
-
-### Second Pass: Optional Auto-Release Logic
-
-The second pass checks keys in `HOLD` state for an optional timed auto-release behavior.
-
-There is legacy support for turning buttons into short momentary pulses using `buttonPressDuration`, with persistent storage via EEPROM. In the current default build, that path is intentionally dormant.
-
-## EEPROM And Legacy Hold-Duration Logic
-
-The sketch still contains these legacy pieces:
-
-- `buttonPressDuration`
-- `EEPROM_BUTTON_DURATION_ADDR`
-- `TOGGLE_BUTTON_DURATION_BTN`
-- `TOGGLE_HOLD_DURATION`
-- `blinkLED()`
-
-But the current implementation explicitly avoids restoring a prior EEPROM value during `setup()`.
-
-Why:
-
-- the legacy trigger button is `100`
-- the default 5x5 build only exposes logical matrix keys `0..24`
-- so that toggle feature cannot be triggered in this layout
-- EEPROM persists across reflashes
-- restoring a stale value from an older sketch could silently convert all buttons into timed momentary presses
-
-The sketch therefore forces:
-
-```cpp
-buttonPressDuration = DEFAULT_PRESS_HOLD;
-```
-
-In practice, the current build behaves as a standard hold-to-press controller unless you intentionally revive and adapt that legacy path.
+This is effectively standard hold-to-press behavior.
 
 ## Rotary Encoder Strategy
 
@@ -425,6 +390,33 @@ You can edit the source in [diagrams.net](https://app.diagrams.net).
 
 These files remain useful, but they should be treated as physical reference material, not as a full specification of the current firmware behavior.
 
+## Viewing Current Configuration
+
+Hold **Button 3** (matrix index 2) for 10 seconds to print the full firmware configuration to the Serial console at 9600 baud:
+
+```
+--- Button Box Config ---
+Firmware: v2.3
+Dimension: 5x5
+Buttons: 25
+Rotaries: 4
+Controller ID: 2
+Joystick report ID: 510
+Layer 2 selector: unassigned
+Layer 3 selector: unassigned
+Rotary-only layers: false
+--------------------------
+```
+
+To view this output:
+
+1. Connect the Pro Micro to your PC via USB
+2. In Arduino IDE, select **Tools → Serial Monitor** (or `Ctrl+Shift+M`)
+3. Set the baud rate to **9600** in the bottom-right dropdown
+4. Hold **Button 3** for 10 seconds
+
+This is useful for verifying which firmware version and configuration is flashed on a device without opening the enclosure. The version string is defined by `FIRMWARE_VERSION` near the top of the sketch.
+
 ## Arduino Setup
 
 ### Required Libraries
@@ -454,9 +446,10 @@ If you also need custom USB naming, apply the `boards.txt` changes from `DEVICES
 
 `DEVICES-MANAGEMENT.md` currently tracks these example device identities:
 
-- `Akamai Box 5x5 - 64 Buttons`
-- `Akamai Box 5x5 - 96 Buttons`
-- `Akamai Box v2 5x5 - 64 Buttons`
+- `Akamai Box 5x5 - 64 Buttons` (v2.1)
+- `Akamai Box 5x5 - 96 Buttons` (v2.1)
+- `Akamai Box 5x5 v2.1 - 64 Buttons` (v2.1)
+- `Akamai Steering Wheel 6x4 v2.3 - 96 Buttons` (v2.3, rotary-only layers)
 
 Those entries document deployed variants. They are not all direct descriptions of the exact default sketch in this repo at this moment.
 
