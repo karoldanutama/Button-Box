@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.3.1 — Print Config on Button 22
+
+### Changed
+- Moved the print-config trigger from **Button 3** (index 2) to **Button 22** (index 21) for the steering wheel layout.
+
+### Fixed
+- Hardware config now matches the steering wheel: `DIMENSION_6x4`, `ROTARY_ONLY_LAYERS` enabled, USB identity `0x255a:0xc613`.
+
 ## v2.3 — Rotary-Only Layer Mode
 
 ### Added
