@@ -7,13 +7,13 @@ This repository started as a fork of AMSTUDIO's 32-function button box project, 
 ## Features
 
 - Arduino Pro Micro / ATmega32U4 HID joystick firmware
-- Default `5x5` matrix configuration with multiple matrix presets in the codebase
+- Default `6x4` matrix configuration with multiple matrix presets in the codebase
 - `3-layer` input model with **dynamic layer selector assignment** via long-press programming gestures
 - Silent layer-selector inputs that do not consume joystick button outputs
 - `4` rotary encoders with per-layer clockwise and counter-clockwise actions
 - `#define ROTARY_ONLY_LAYERS` compile-time toggle to restrict layering to encoders only
-- Long-press **Button 3** for 10s to print full firmware configuration to Serial console
-- Up to `96` declared joystick buttons, with `93` actively used in the default build
+- Long-press **Button 22** for 10s to print full firmware configuration to Serial console
+- Up to `96` declared joystick buttons, with `90` actively used in the default build
 - Compact logical-to-joystick button remapping that skips reserved selector positions
 - Safe button release handling across mid-press layer changes
 - Custom controller report IDs for running multiple boxes on one system
@@ -40,15 +40,15 @@ The default configuration in `button_box/button_box.ino` is:
 
 - MCU: Arduino Pro Micro / ATmega32U4
 - USB mode: HID joystick via `ArduinoJoystickLibrary`
-- Matrix preset: `DIMENSION_5x5`
-- Physical matrix positions: `25`
+- Matrix preset: `DIMENSION_6x4`
+- Physical matrix positions: `24`
 - Reserved matrix positions: `2` for layer selection (dynamically assignable)
-- Active matrix inputs: `23`
+- Active matrix inputs: `22`
 - Rotary encoders: `4`
 - Layers: `3`
 - Declared joystick buttons: `96`
-- Actively used joystick buttons: `93`
-- Firmware version: queryable via Button 3 long-press (Serial, 9600 baud)
+- Actively used joystick buttons: `90`
+- Firmware version: queryable via Button 22 long-press (Serial, 9600 baud)
 
 ## Source Of Truth
 
@@ -134,31 +134,30 @@ Each preset determines:
 The current default is:
 
 ```cpp
-#define DIMENSION_5x5
+#define DIMENSION_6x4
 ```
 
-For the 5x5 preset, the row/column wiring in the sketch is:
+For the 6x4 preset, the row/column wiring in the sketch is:
 
 ```cpp
-byte rowPins[NUMROWS] = {21,20,19,18,15};
-byte colPins[NUMCOLS] = {14,16,10,9,8};
+byte rowPins[NUMROWS] = {21,20,19,18,15,14};
+byte colPins[NUMCOLS] = {16,10,9,8};
 ```
 
 ## Matrix Mapping Strategy
 
-The Keypad library works with logical key codes stored in the `buttons[][]` array. In the default 5x5 configuration, the matrix is mapped to logical button indices `0..24`.
+The Keypad library works with logical key codes stored in the `buttons[][]` array. In the default 6x4 configuration, the matrix is mapped to logical button indices `0..23`.
 
 ```cpp
 byte buttons[NUMROWS][NUMCOLS] = {
-  {0,1,2,3,4},
-  {5,6,7,8,9},
-  {10,11,12,13,14},
-  {15,16,17,18,19},
-  {20,21,22,23,24},
+  {0,1,2,3},
+  {4,5,6,7},
+  {8,9,10,11},
+  {12,13,14,15},
+  {16,17,18,19},
+  {20,21,22,23},
 };
 ```
-
-This repo also fixes a bug present in an earlier 5x5 mapping where the last row repeated `20`, which made logical button `24` unreachable.
 
 ## Layering Strategy
 
@@ -194,19 +193,19 @@ The firmware separates physical inputs from joystick output numbers.
 
 ### Step 1: Exclude Layer Selectors From Normal Button Output
 
-In the default 5x5 setup there are `25` logical matrix positions, but two are reserved for the layer switch.
+In the default 6x4 setup there are `24` logical matrix positions, but two are reserved for the layer switch.
 
 ```cpp
 #define NUM_ACTIVE_BUTTONS (NUMBUTTONS - 2)
 ```
 
-So only `23` matrix positions generate normal joystick outputs.
+So only `22` matrix positions generate normal joystick outputs.
 
 ### Step 2: Compact The Remaining Physical Buttons
 
 During `setup()`, the sketch builds `outputSlotForKchar[]` from the EEPROM-loaded selector indices.
 
-This converts each physical/logical matrix key code into a compact output slot from `0..22`, skipping the two selector indices (whatever they are assigned to).
+This converts each physical/logical matrix key code into a compact output slot from `0..21`, skipping the two selector indices (whatever they are assigned to).
 
 That means joystick numbering does not have holes just because two physical positions are dedicated to layer selection.
 
@@ -220,9 +219,9 @@ outputButton = slot + (currentLayer - 1) * NUM_ACTIVE_BUTTONS;
 
 In the default build:
 
-- Layer 1 matrix outputs: `0..22`
-- Layer 2 matrix outputs: `23..45`
-- Layer 3 matrix outputs: `46..68`
+- Layer 1 matrix outputs: `0..21`
+- Layer 2 matrix outputs: `22..43`
+- Layer 3 matrix outputs: `44..65`
 
 ### Step 4: Reserve A Separate Encoder Range
 
@@ -234,10 +233,10 @@ Encoders are allocated after all matrix-derived outputs:
 
 For the default build that means:
 
-- matrix outputs occupy `0..68`
-- encoder outputs occupy `69..92`
+- matrix outputs occupy `0..65`
+- encoder outputs occupy `66..89`
 
-`TOTAL_JOYSTICK_BUTTONS` is declared as `96`, leaving a small amount of headroom above the `93` actively used outputs.
+`TOTAL_JOYSTICK_BUTTONS` is declared as `96`, leaving headroom above the `90` actively used outputs.
 
 ## Why Releases Stay Correct Across Layer Changes
 
@@ -392,19 +391,22 @@ These files remain useful, but they should be treated as physical reference mate
 
 ## Viewing Current Configuration
 
-Hold **Button 3** (matrix index 2) for 10 seconds to print the full firmware configuration to the Serial console at 9600 baud:
+Hold **Button 22** (matrix index 21) for 10 seconds to print the full firmware configuration to the Serial console at 9600 baud:
 
 ```
 --- Button Box Config ---
-Firmware: v2.3
-Dimension: 5x5
-Buttons: 25
+Firmware: v2.3.1
+Dimension: 6x4
+Buttons: 24
 Rotaries: 4
 Controller ID: 2
 Joystick report ID: 510
+USB VID: 0x255a
+USB PID: 0xc613
+USB Product: Akamai Steering Wheel 6x4 v2.3.1 - 96 Buttons
 Layer 2 selector: unassigned
 Layer 3 selector: unassigned
-Rotary-only layers: false
+Rotary-only layers: true
 --------------------------
 ```
 
@@ -413,7 +415,7 @@ To view this output:
 1. Connect the Pro Micro to your PC via USB
 2. In Arduino IDE, select **Tools → Serial Monitor** (or `Ctrl+Shift+M`)
 3. Set the baud rate to **9600** in the bottom-right dropdown
-4. Hold **Button 3** for 10 seconds
+4. Hold **Button 22** for 10 seconds
 
 This is useful for verifying which firmware version and configuration is flashed on a device without opening the enclosure. The version string is defined by `FIRMWARE_VERSION` near the top of the sketch.
 
@@ -449,7 +451,7 @@ If you also need custom USB naming, apply the `boards.txt` changes from `DEVICES
 - `Akamai Box 5x5 - 64 Buttons` (v2.1)
 - `Akamai Box 5x5 - 96 Buttons` (v2.1)
 - `Akamai Box 5x5 v2.1 - 64 Buttons` (v2.1)
-- `Akamai Steering Wheel 6x4 v2.3 - 96 Buttons` (v2.3, rotary-only layers)
+- `Akamai Steering Wheel 6x4 v2.3.1 - 96 Buttons` (v2.3.1, rotary-only layers)
 
 Those entries document deployed variants. They are not all direct descriptions of the exact default sketch in this repo at this moment.
 
