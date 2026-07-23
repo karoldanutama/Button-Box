@@ -13,6 +13,37 @@ The firmware lives in `button_box/button_box.ino`. All development follows the w
 
 ---
 
+## 0. Before Making Changes: Ask About Target Hardware
+
+The firmware is tested against a specific physical device. **Before starting any code changes**, ask the user:
+
+> Which device are you deploying to? What are its current hardware specs?
+
+Collect these values from the user (or look them up in `DEVICES-MANAGEMENT.md`):
+
+| Value | Define | Example |
+|-------|--------|---------|
+| Matrix preset | `DIMENSION_*` | `5x5` |
+| Rotary-only layers? | `#define ROTARY_ONLY_LAYERS` | commented out (false) |
+| USB VID | `BOX_VID` | `"0x256a"` |
+| USB PID | `BOX_PID` | `"0xc615"` |
+| USB Product name | `BOX_PRODUCT` | `"Akamai Box 5x5"` |
+| Controller ID | `CONTROLLER_ID` | `2` |
+
+**Make sure the `#define` values in `button_box/button_box.ino` match the target hardware before committing.** The PR must contain code that is ready to deploy — no additional manual config editing required after merge.
+
+---
+
+## 0.1. Deployment Workflow
+
+Development happens on **Linux**, but the firmware is deployed by **copy-pasting the code into the Windows Arduino IDE** and uploading from there. Because of this:
+
+- The `#define` configuration at the top of `button_box/button_box.ino` must already match the target hardware
+- The user should not need to edit any constants before uploading
+- If the PR changes behavior that requires different config per device, handle it with compile-time toggles (e.g., `#define ROTARY_ONLY_LAYERS`) so the user can set it once and forget it
+
+---
+
 ## 1. Conventional Commits
 
 Every PR must follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) format:
