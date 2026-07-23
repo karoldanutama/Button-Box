@@ -12,7 +12,7 @@ This repository started as a fork of AMSTUDIO's 32-function button box project, 
 - Silent layer-selector inputs that do not consume joystick button outputs
 - `4` rotary encoders with per-layer clockwise and counter-clockwise actions
 - `#define ROTARY_ONLY_LAYERS` compile-time toggle to restrict layering to encoders only
-- Long-press **Button 3** for 10s to print firmware version to Serial console
+- Long-press **Button 3** for 10s to print full firmware configuration to Serial console
 - Up to `96` declared joystick buttons, with `93` actively used in the default build
 - Compact logical-to-joystick button remapping that skips reserved selector positions
 - Safe button release handling across mid-press layer changes
@@ -390,15 +390,32 @@ You can edit the source in [diagrams.net](https://app.diagrams.net).
 
 These files remain useful, but they should be treated as physical reference material, not as a full specification of the current firmware behavior.
 
-## Firmware Version Output
+## Viewing Current Configuration
 
-Hold **Button 3** (matrix index 2) for 10 seconds to print the firmware version to the Serial console at 9600 baud:
+Hold **Button 3** (matrix index 2) for 10 seconds to print the full firmware configuration to the Serial console at 9600 baud:
 
 ```
+--- Button Box Config ---
 Firmware: v2.3
+Dimension: 5x5
+Buttons: 25
+Rotaries: 4
+Controller ID: 2
+Joystick report ID: 510
+Layer 2 selector: unassigned
+Layer 3 selector: unassigned
+Rotary-only layers: false
+--------------------------
 ```
 
-This is useful for verifying which version is flashed on a device without opening the enclosure. The version string is defined by `FIRMWARE_VERSION` near the top of the sketch.
+To view this output:
+
+1. Connect the Pro Micro to your PC via USB
+2. In Arduino IDE, select **Tools → Serial Monitor** (or `Ctrl+Shift+M`)
+3. Set the baud rate to **9600** in the bottom-right dropdown
+4. Hold **Button 3** for 10 seconds
+
+This is useful for verifying which firmware version and configuration is flashed on a device without opening the enclosure. The version string is defined by `FIRMWARE_VERSION` near the top of the sketch.
 
 ## Arduino Setup
 
