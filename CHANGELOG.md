@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.5.1 — Restore Rotary Inputs in Rotary-Only Mode
+
+### Fixed
+- Restored Layer 2/3 rotary encoder inputs when `ROTARY_ONLY_LAYERS` is enabled. Encoder outputs now start immediately after the 24 base buttons (`24..47`) instead of being pushed into the high `72..95` range, which some games were not reading.
+
 ## v2.5 — Static Button Mapping
 
 ### Changed

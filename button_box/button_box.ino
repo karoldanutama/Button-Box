@@ -31,7 +31,7 @@
 // USB identity -- must match the values in boards.txt (see DEVICES-MANAGEMENT.md)
 #define BOX_VID "0x255a"
 #define BOX_PID "0xc613"
-#define BOX_PRODUCT "Akamai Steering Wheel 6x4 v2.5 - 96 Buttons"
+#define BOX_PRODUCT "Akamai Steering Wheel 6x4 v2.5.1 - 96 Buttons"
 
 // Use completely different report IDs to avoid conflicts
 #if CONTROLLER_ID == 1
@@ -96,7 +96,7 @@
 #define EEPROM_LAYER2_ADDR 1
 #define EEPROM_LAYER3_ADDR 2
 #define PROG_HOLD_DURATION 5000 // Hold duration in ms for programming gestures
-#define FIRMWARE_VERSION "2.5"
+#define FIRMWARE_VERSION "2.5.1"
 #define VERSION_BUTTON 21 // Button 22 (index 21) held 5s prints version to Serial
 
 // When defined, only rotary encoders respond to layer changes.
@@ -105,10 +105,19 @@
 #define ROTARY_ONLY_LAYERS
 
 // Output numbering (static — button index = output index, gaps for layer selectors):
-//   Matrix buttons: 0..(NUMBUTTONS*3 - 1)   => 0-71  (24 per layer)
-//   Encoders:       ENCODER_BASE..ENCODER_BASE+23   => 72-95 (8 per layer)
-// Total used: 96. Declared to the Joystick library as 96.
+//   Normal layered mode:
+//     Matrix buttons: 0..(NUMBUTTONS*3 - 1) => 0-71
+//     Encoders:       72..95
+//   Rotary-only mode:
+//     Matrix buttons: 0..23
+//     Encoders:       24..47
+// Keeping rotary-only encoders in the low range avoids games that ignore
+// higher-numbered buttons from clipping Layer 2/3 rotary inputs.
+#ifdef ROTARY_ONLY_LAYERS
+#define ENCODER_BASE NUMBUTTONS
+#else
 #define ENCODER_BASE (NUMBUTTONS * 3)
+#endif
 #define TOTAL_JOYSTICK_BUTTONS 96
 
 #if defined(DIMENSION_3x11)
