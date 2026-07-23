@@ -7,9 +7,9 @@
 // --- MODIFIED: Dynamic layer selector assignment ---
 // Layer selectors are no longer hardcoded. Users assign which physical
 // buttons act as layer toggles via long-press programming gestures:
-//   B1 + BX held 10s  -> BX becomes Layer 2 selector
-//   B2 + BY held 10s  -> BY becomes Layer 3 selector
-//   B1 + B2 held 10s  -> reset both selectors (no layers, 25 active buttons)
+//   B1 + BX held 5s  -> BX becomes Layer 2 selector
+//   B2 + BY held 5s  -> BY becomes Layer 3 selector
+//   B1 + B2 held 5s  -> reset both selectors (no layers, 25 active buttons)
 // Selector assignments persist in EEPROM across power cycles.
 // Default: unassigned (255) -- all 25 buttons are active, Layer 1 only.
 //
@@ -31,7 +31,7 @@
 // USB identity -- must match the values in boards.txt (see DEVICES-MANAGEMENT.md)
 #define BOX_VID "0x255a"
 #define BOX_PID "0xc613"
-#define BOX_PRODUCT "Akamai Steering Wheel 6x4 v2.3.1 - 96 Buttons"
+#define BOX_PRODUCT "Akamai Steering Wheel 6x4 v2.4 - 96 Buttons"
 
 // Use completely different report IDs to avoid conflicts
 #if CONTROLLER_ID == 1
@@ -95,9 +95,9 @@
 // EEPROM addresses for persistent selector configuration.
 #define EEPROM_LAYER2_ADDR 1
 #define EEPROM_LAYER3_ADDR 2
-#define PROG_HOLD_DURATION 10000 // Hold duration in ms for programming gestures
-#define FIRMWARE_VERSION "2.3.1"
-#define VERSION_BUTTON 21 // Button 22 (index 21) held 10s prints version to Serial
+#define PROG_HOLD_DURATION 5000 // Hold duration in ms for programming gestures
+#define FIRMWARE_VERSION "2.4"
+#define VERSION_BUTTON 21 // Button 22 (index 21) held 5s prints version to Serial
 
 // When defined, only rotary encoders respond to layer changes.
 // Buttons always output on Layer 1 regardless of the current layer.
@@ -446,9 +446,9 @@ void saveSelectorConfig() {
 }
 
 // State machine that detects long-press programming gestures:
-//   B1 + BX held 10s  -> assign BX as Layer 2 selector
-//   B2 + BY held 10s  -> assign BY as Layer 3 selector
-//   B1 + B2 held 10s  -> reset both selectors to unassigned
+//   B1 + BX held 5s  -> assign BX as Layer 2 selector
+//   B2 + BY held 5s  -> assign BY as Layer 3 selector
+//   B1 + B2 held 5s  -> reset both selectors to unassigned
 // Early release of any involved button cancels the gesture.
 void CheckProgrammingGestures() {
   bool b1Down = false, b2Down = false;
@@ -524,6 +524,8 @@ void CheckProgrammingGestures() {
       } else if (millis() - progStartTime >= PROG_HOLD_DURATION) {
         layer2Index = progTarget;
         saveSelectorConfig();
+        Serial.print(F("Layer 2 selector assigned to button "));
+        Serial.println(progTarget);
         progState = PROG_IDLE;
         progTarget = 255;
       }
@@ -535,6 +537,8 @@ void CheckProgrammingGestures() {
       } else if (millis() - progStartTime >= PROG_HOLD_DURATION) {
         layer3Index = progTarget;
         saveSelectorConfig();
+        Serial.print(F("Layer 3 selector assigned to button "));
+        Serial.println(progTarget);
         progState = PROG_IDLE;
         progTarget = 255;
       }
@@ -547,6 +551,7 @@ void CheckProgrammingGestures() {
         layer2Index = 255;
         layer3Index = 255;
         saveSelectorConfig();
+        Serial.println(F("Layer selectors reset (unassigned)"));
         progState = PROG_IDLE;
       }
       break;
