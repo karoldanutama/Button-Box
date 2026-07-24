@@ -118,7 +118,7 @@
 #else
 #define ENCODER_BASE (NUMBUTTONS * 3)
 #endif
-#define TOTAL_JOYSTICK_BUTTONS 96
+#define TOTAL_JOYSTICK_BUTTONS 100
 
 #if defined(DIMENSION_3x11)
 byte buttons[NUMROWS][NUMCOLS] = {
