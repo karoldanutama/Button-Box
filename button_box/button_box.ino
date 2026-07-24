@@ -26,12 +26,12 @@
 
 // Controller Configuration -- Change this before deploy
 #define CONTROLLER_ID 2 // Change this to 1 for the second controller, 2 for third, etc.
-#define DIMENSION_6x4
+#define DIMENSION_5x5
 
 // USB identity -- must match the values in boards.txt (see DEVICES-MANAGEMENT.md)
-#define BOX_VID "0x255a"
-#define BOX_PID "0xc613"
-#define BOX_PRODUCT "Akamai Steering Wheel 6x4 v2.5.1 - 96 Buttons"
+#define BOX_VID "0x256c"
+#define BOX_PID "0xc616"
+#define BOX_PRODUCT "Akamai Box 5x5 - 96 Buttons"
 
 // Use completely different report IDs to avoid conflicts
 #if CONTROLLER_ID == 1
@@ -102,7 +102,7 @@
 // When defined, only rotary encoders respond to layer changes.
 // Buttons always output on Layer 1 regardless of the current layer.
 // Uncomment this line to enable rotary-only layer mode.
-#define ROTARY_ONLY_LAYERS
+// #define ROTARY_ONLY_LAYERS
 
 // Output numbering (static — button index = output index, gaps for layer selectors):
 //   Normal layered mode:
